@@ -15,9 +15,10 @@ import json
 import joblib
 import numpy as np
 import pandas as pd
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 
 app = Flask(__name__)
+app.secret_key = "visitantalya_super_secret_key_2026"  # Güvenlik anahtarı
 
 import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -44,6 +45,9 @@ load_models()
 
 @app.route("/")
 def index():
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
+        
     stats = {
         "veri_kaydi": state.get("veri_kaydi", 31848),
         "r2_cv": state.get("r2_cv", 0.0),
@@ -52,8 +56,28 @@ def index():
     }
     return render_template("index.html", stats=stats)
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        password = request.form.get("password")
+        if password == "!Asd12345678":
+            session["logged_in"] = True
+            return redirect(url_for("index"))
+        else:
+            error = "Hatalı şifre! Lütfen tekrar deneyin."
+    return render_template("login.html", error=error)
+
+@app.route("/logout")
+def logout():
+    session.pop("logged_in", None)
+    return redirect(url_for("login"))
+
 @app.route("/api/predict", methods=["POST"])
 def predict():
+    if not session.get("logged_in"):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+        
     try:
         data = request.json
         ilce = data.get("ilce", "Antalya")
@@ -200,6 +224,9 @@ def predict():
 
 @app.route("/api/feedback", methods=["POST"])
 def feedback():
+    if not session.get("logged_in"):
+        return jsonify({"success": False, "error": "Unauthorized"}), 401
+
     try:
         data = request.json
         ulke_kodu = str(data.get("ulke_kodu"))
@@ -257,5 +284,6 @@ def feedback():
 def get_logs():
     return jsonify({"logs": state.get("ogrenme_log", [])[:10]})
 
-if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, debug=True)
+if __name__ == '__main__':
+    # '0.0.0.0' sayesinde aynı Wi-Fi ağındaki telefonlardan erişilebilir olur
+    app.run(host='0.0.0.0', port=5000, debug=True)

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sisteme Giriş - VisitAntalya</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .login-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 24px;
+        }
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .login-card h2 {
+            margin-bottom: 8px;
+            font-size: 24px;
+        }
+        .login-card p {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-bottom: 32px;
+        }
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .login-form input {
+            padding: 14px;
+            font-size: 16px;
+            text-align: center;
+            letter-spacing: 2px;
+        }
+        .error-message {
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-shape shape1"></div>
+    <div class="bg-shape shape2"></div>
+
+    <div class="login-wrapper">
+        <div class="glass-panel login-card">
+            <div class="logo" style="margin-bottom: 24px;">
+                <h2>Visit<span>Antalya</span></h2>
+                <div class="badge">SüperApp ML Engine</div>
+            </div>
+            
+            <h2>Sisteme Giriş</h2>
+            <p>Otel personeli yetkili giriş ekranı</p>
+
+            {% if error %}
+            <div class="error-message">
+                {{ error }}
+            </div>
+            {% endif %}
+
+            <form class="login-form" method="POST" action="{{ url_for('login') }}">
+                <input type="password" name="password" placeholder="Kurumsal Şifre" required autofocus>
+                <button type="submit" class="btn-primary" style="padding: 14px; font-size: 16px;">Giriş Yap</button>
+            </form>
+            
+            <p style="margin-top: 24px; font-size: 12px; color: var(--text-muted);">
+                <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none" style="vertical-align: middle; margin-right: 4px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                Güvenli Bağlantı (256-bit)
+            </p>
+        </div>
+    </div>
+</body>
+</html>
