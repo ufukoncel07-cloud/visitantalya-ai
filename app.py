@@ -325,6 +325,7 @@ def predict():
             "ulke": ulke_ad,
             "yas_grubu": yas_grup(yas),
             "tahmini_butce_usd": int(usd_p),
+            "butce_bandi": bant,
             "harcama_profili": {
                 "gastronomi_usd": int(usd_gas),
                 "alisveris_usd": int(usd_ali),

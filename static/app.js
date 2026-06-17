@@ -94,6 +94,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('res-yas').textContent = data.yas_grubu;
         document.getElementById('res-csi').textContent = `${data.memnuniyet_csi} / 10`;
 
+        if (data.harcama_profili) {
+            document.getElementById('res-gas').textContent = `$${data.harcama_profili.gastronomi_usd}`;
+            document.getElementById('res-ali').textContent = `$${data.harcama_profili.alisveris_usd}`;
+            document.getElementById('res-kul').textContent = `$${data.harcama_profili.kultur_usd}`;
+            document.getElementById('res-sag').textContent = `$${data.harcama_profili.saglik_usd}`;
+        }
+
         // Render XAI Charts
         if(data.xai_proof) {
             renderDecayChart(data.xai_proof.decay_curve);
