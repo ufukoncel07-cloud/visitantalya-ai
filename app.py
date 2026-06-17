@@ -292,6 +292,9 @@ def feedback():
 def get_logs():
     return jsonify({"logs": state.get("ogrenme_log", [])[:10]})
 
+# Uygulama başlatılırken modelleri yükle (Gunicorn/Render uyumluluğu için)
+load_models()
+
 if __name__ == '__main__':
     # '0.0.0.0' sayesinde aynı Wi-Fi ağındaki telefonlardan erişilebilir olur
     app.run(host='0.0.0.0', port=5000, debug=True)
