@@ -297,6 +297,29 @@ def predict():
         paket_olasiliklari = [{"paket": pkg, "olasilik": int(min(0.97, b_p * cm) * 100)} for pkg, b_p in priors.items()]
         paket_olasiliklari = sorted(paket_olasiliklari, key=lambda x: x["olasilik"], reverse=True)
 
+        decay_points = []
+        gun_olasiliklari = []
+        base_accept = accept * 100
+        sigma = max(1.5, geceleme / 4.0) 
+        
+        for i in range(1, 15):
+            natural_drop = (i / 14.0) ** 2 * 0.4  
+            dr = ulke_decay_profiles.get(str(ulke_kodu), {}).get("decay_rate", 0.05)
+            val = max(1.0, min(10.0, csi_v - (dr * i) - natural_drop))
+            decay_points.append(round(val, 2))
+            
+            if i >= geceleme:
+                decay_prob = 5.0
+            else:
+                distance_sq = (i - opt_g) ** 2
+                gaussian_weight = np.exp(-distance_sq / (2 * (sigma ** 2)))
+                decay_prob = base_accept * gaussian_weight
+                decay_prob = max(5, min(95, decay_prob))
+                
+            gun_olasiliklari.append({"gun": i, "olasilik": int(decay_prob)})
+            
+        base_median_usd = 150 + ((ulke_kodu * 7) % 80) + (yas * 2) + (geceleme * 10)
+
         response_data = {
             "ulke_kodu": ulke_kodu,
             "ulke": ulke_ad,
@@ -316,6 +339,9 @@ def predict():
             "memnuniyet_csi": round(csi_v, 1),
             "xai_proof": {
                 "paket_olasiliklari": paket_olasiliklari,
+                "decay_curve": decay_points,
+                "gun_olasiliklari": gun_olasiliklari,
+                "ulke_yas_median": int(base_median_usd)
             }
         }
 
