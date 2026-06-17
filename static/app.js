@@ -92,6 +92,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if(data.xai_proof) {
             renderDecayChart(data.xai_proof.decay_curve);
             renderBudgetChart(data.xai_proof.ulke_yas_median, data.tahmini_butce_usd, data.ulke);
+            
+            // Paket Olasılıkları
+            const pktList = document.getElementById('paket-listesi');
+            if (pktList && data.xai_proof.paket_olasiliklari) {
+                pktList.innerHTML = '';
+                data.xai_proof.paket_olasiliklari.forEach(p => {
+                    pktList.innerHTML += `<div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.05); padding:8px 12px; border-radius:6px;">
+                        <span style="font-size:13px; color:#f8fafc;">${p.paket.replace('_', ' ')}</span>
+                        <span style="font-size:13px; font-weight:bold; color:${p.olasilik > 50 ? '#10b981' : '#f59e0b'};">%${p.olasilik}</span>
+                    </div>`;
+                });
+            }
+            
+            // Gün Olasılıkları
+            const gunList = document.getElementById('gun-listesi');
+            if (gunList && data.xai_proof.gun_olasiliklari) {
+                gunList.innerHTML = '';
+                data.xai_proof.gun_olasiliklari.forEach(g => {
+                    gunList.innerHTML += `<div style="min-width:70px; text-align:center; background:rgba(255,255,255,0.05); padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
+                        <div style="font-size:11px; color:#94a3b8; margin-bottom:4px;">${g.gun}. Gün</div>
+                        <div style="font-size:14px; font-weight:bold; color:${g.olasilik > 40 ? '#3b82f6' : '#ef4444'};">%${g.olasilik}</div>
+                    </div>`;
+                });
+            }
         }
     }
 
