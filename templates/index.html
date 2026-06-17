@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VisitAntalya ML SuperApp</title>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='icon.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon.png') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="bg-shape shape1"></div>
+    <div class="bg-shape shape2"></div>
+
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <img src="{{ url_for('static', filename='icon.png') }}" alt="Logo" style="width: 60px; height: 60px; border-radius: 50%; margin-bottom: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.3);">
+                <h2>Visit<span>Antalya</span></h2>
+                <div class="badge">SüperApp ML Engine</div>
+            </div>
+
+            <ul class="nav">
+                <li class="active">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+                    Canlı Simülatör
+                </li>
+                <li onclick="switchView('dashboard')">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                    Model İstatistikleri
+                </li>
+                <li style="margin-top: 16px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 16px;" onclick="window.location.href='{{ url_for('logout') }}'">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    Güvenli Çıkış
+                </li>
+            </ul>
+
+            <div class="learning-status">
+                <h4>Sürekli Öğrenme (Bayesian)</h4>
+                <div class="status-indicator">
+                    <div class="pulse"></div>
+                    Aktif ve Dinliyor
+                </div>
+                <div class="mini-logs" id="mini-logs">
+                    <!-- JS ile doldurulacak -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content">
+            
+            <!-- VIEW: SIMULATOR -->
+            <section id="simulator" class="view active">
+                <header>
+                    <h1>Gerçek Zamanlı Turist Analizi</h1>
+                    <p>Müşteri profilini girin, makine öğrenmesi algoritmamız anında kişiselleştirilmiş bir tur önerisi ve kabul olasılığı sunsun.</p>
+                </header>
+
+                <div class="simulator-layout">
+                    <!-- Form -->
+                    <div class="glass-panel form-panel">
+                        <h3>Turist Profili</h3>
+                        <form id="predict-form">
+                            <div class="form-group">
+                                <label>Uyruk</label>
+                                <select name="ulke" id="ulke" required>
+                                    <option value="4" selected>Almanya</option>
+                                    <option value="75">Rusya</option>
+                                    <option value="60">Polonya</option>
+                                    <option value="6">İngiltere</option>
+                                    <option value="79">Kazakistan</option>
+                                    <option value="66">Romanya</option>
+                                    <option value="8">Danimarka</option>
+                                    <option value="17">Belçika</option>
+                                    <option value="3">Hollanda</option>
+                                    <option value="39">İsviçre</option>
+                                </select>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Yaş</label>
+                                    <input type="number" name="yas" id="yas" value="35" min="18" max="99" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Çocuk Sayısı</label>
+                                    <input type="number" name="cocuk" id="cocuk" value="0" min="0" max="5" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Geceleme Süresi</label>
+                                    <input type="number" name="gece" id="gece" value="7" min="1" max="30" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Otel Yıldızı</label>
+                                    <select name="otel" id="otel">
+                                        <option value="5" selected>5 Yıldız</option>
+                                        <option value="4">4 Yıldız</option>
+                                        <option value="3">3 Yıldız</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Konaklanacak Bölge (İlçe)</label>
+                                <select name="ilce" id="ilce" required>
+                                    <option value="Manavgat" selected>Manavgat</option>
+                                    <option value="Alanya">Alanya</option>
+                                    <option value="Kemer">Kemer</option>
+                                    <option value="Serik">Serik</option>
+                                    <option value="Muratpaşa">Muratpaşa</option>
+                                    <option value="Aksu">Aksu</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn-primary" id="btn-predict">Analiz Et ve Öner</button>
+                        </form>
+                    </div>
+
+                    <!-- Result Panel -->
+                    <div class="result-panel">
+                        <div id="loading-overlay" class="hidden">
+                            <div class="spinner"></div>
+                            <p>GBM Ağaçları Taranıyor...</p>
+                        </div>
+                        
+                        <div id="prediction-result" class="glass-panel hidden">
+                            <div class="result-header">
+                                <div class="tour-badge" id="res-tour">AİLE_PAKETI</div>
+                                <div class="prob-circle">
+                                    <svg viewBox="0 0 36 36" class="circular-chart">
+                                        <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                        <path class="circle" id="prob-circle" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                        <text x="18" y="20.35" class="percentage" id="res-prob">%0</text>
+                                    </svg>
+                                    <span class="prob-label">Kabul Olasılığı</span>
+                                </div>
+                            </div>
+
+                            <div class="result-grid">
+                                <div class="res-item">
+                                    <span class="label">Tahmini Harcama (GBM)</span>
+                                    <span class="value" id="res-usd">$0</span>
+                                </div>
+                                <div class="res-item">
+                                    <span class="label">Bütçe Segmenti</span>
+                                    <span class="value" id="res-bant">-</span>
+                                </div>
+                                <div class="res-item">
+                                    <span class="label">Optimum Bildirim Günü</span>
+                                    <span class="value" id="res-gun">Gün 0</span>
+                                </div>
+                                <div class="res-item">
+                                    <span class="label">Bildirim Saati</span>
+                                    <span class="value" id="res-saat">00:00</span>
+                                </div>
+                                <div class="res-item">
+                                    <span class="label">Yaş Grubu</span>
+                                    <span class="value" id="res-yas">-</span>
+                                </div>
+                                <div class="res-item">
+                                    <span class="label">Kullanılan CSI</span>
+                                    <span class="value" id="res-csi">0/10</span>
+                                </div>
+                            </div>
+
+                        <!-- Feedback Actions -->
+                            <div class="feedback-actions">
+                                <h4>Müşteri Geribildirimi (Öğrenme Döngüsü)</h4>
+                                <div class="btn-group">
+                                    <button class="btn-action success" onclick="sendFeedback(1, 'kusursuz_zamanlama')">Satın Aldı ✅</button>
+                                    <button class="btn-action danger" onclick="sendFeedback(0, 'fiyat_pahali')">Reddetti (Pahalı) ❌</button>
+                                    <button class="btn-action warning" onclick="sendFeedback(0, 'gec_oneri')">Reddetti (Geç/Sıkıldı) ❌</button>
+                                </div>
+                            </div>
+
+                            <!-- XAI Proof Panel -->
+                            <div class="xai-panel" style="margin-top: 32px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 24px;">
+                                <h3 style="margin-bottom: 16px; font-size: 16px; color: #f8fafc; display: flex; align-items: center; gap: 8px;">
+                                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                                    İstatistiksel Kanıt (XAI)
+                                </h3>
+                                <div class="xai-grid" style="display: grid; gap: 24px;">
+                                    <div class="chart-container" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
+                                        <p style="font-size: 12px; color: #94a3b8; margin-bottom: 8px; text-align: center;">Memnuniyet Çöküş (Decay) Eğrisi</p>
+                                        <canvas id="decayChart"></canvas>
+                                    </div>
+                                    <div class="chart-container" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
+                                        <p style="font-size: 12px; color: #94a3b8; margin-bottom: 8px; text-align: center;">Bütçe Karşılaştırması</p>
+                                        <canvas id="budgetChart"></canvas>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Initial State -->
+                        <div id="initial-state" class="glass-panel empty-state">
+                            <svg viewBox="0 0 24 24" width="48" height="48" stroke="rgba(255,255,255,0.2)" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            <p>Tahmin motorunu çalıştırmak için sol taraftan profil bilgilerini doldurun.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: DASHBOARD -->
+            <section id="dashboard" class="view">
+                <header>
+                    <h1>Model İstatistikleri</h1>
+                    <p>Bayesçi ağırlıklar, eğitim hacmi ve veri özetleri.</p>
+                </header>
+                
+                <div class="stats-grid">
+                    <div class="stat-card glass-panel">
+                        <h3>Toplam Öğrenme Verisi</h3>
+                        <div class="stat-value">{{ stats.veri_kaydi }}</div>
+                        <p class="stat-desc">Turist Profili Analiz Edildi</p>
+                    </div>
+                    <div class="stat-card glass-panel">
+                        <h3>En Çok Turist Gönderenler</h3>
+                        <ul class="top-list">
+                            {% for code, name in stats.top_ulkeler %}
+                                <li>{{ name }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">Güncelleme başarılı!</div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
