@@ -24,8 +24,9 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Model Yolları
-MODEL_JSON = os.path.join(BASE_DIR, "models", "model_state_v31.json")
-MODEL_PKL  = os.path.join(BASE_DIR, "models", "visitantalya_models.pkl")
+model_dir = "modeller" if os.path.exists(os.path.join(BASE_DIR, "modeller")) else "models"
+MODEL_JSON = os.path.join(BASE_DIR, model_dir, "model_state_v31.json")
+MODEL_PKL  = os.path.join(BASE_DIR, model_dir, "visitantalya_models.pkl")
 
 # Global bellek içi model nesneleri (Sadece ilk çalışmada yüklenir)
 state = None
