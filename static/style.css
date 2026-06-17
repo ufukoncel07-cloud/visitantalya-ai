@@ -529,6 +529,10 @@ select option {
         gap: 16px;
     }
     
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+    
     .xai-grid {
         grid-template-columns: 1fr;
     }
@@ -537,9 +541,21 @@ select option {
         font-size: 24px;
     }
     
+    .result-header {
+        flex-direction: column;
+        gap: 16px;
+        text-align: center;
+    }
+    
+    .tour-badge {
+        width: 100%;
+        font-size: 16px;
+        padding: 10px;
+    }
+    
     .result-grid {
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
+        grid-template-columns: 1fr;
+        gap: 12px;
     }
     
     .btn-group {

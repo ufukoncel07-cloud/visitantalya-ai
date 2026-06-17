@@ -1,6 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
     
-    // Tab Switching Logic
+    // Set default check-in date to today
+    const checkinInput = document.getElementById('checkin');
+    if (checkinInput) {
+        const today = new Date().toISOString().split('T')[0];
+        checkinInput.value = today;
+    }
     const navItems = document.querySelectorAll('.nav li');
     const views = document.querySelectorAll('.view');
 
@@ -41,7 +46,8 @@ document.addEventListener('DOMContentLoaded', () => {
             cocuk: document.getElementById('cocuk').value,
             gece: document.getElementById('gece').value,
             otel: document.getElementById('otel').value,
-            ilce: document.getElementById('ilce').value
+            ilce: document.getElementById('ilce').value,
+            checkin: document.getElementById('checkin').value
         };
 
         try {

@@ -1,6 +1,37 @@
+# Python
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+*.pyo
+*.egg-info/
+
+# Virtual Environment
 .venv/
 venv/
+env/
+
+# uv
+.python-version
+
+# Ham Veri - GITHUB'A ATILMAZ (kisisel veri icerir)
+*.xlsx
+*.xls
+*.csv
+
+# Eski model - buyuk ve gereksiz
+models/visitantalya_models.pkl
+
+# Sistem & IDE
 .DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Log dosyalari
+*.log
+*.tmp
+
+# Gizli ayarlar - KESINLIKLE ATILMAZ
+.env
+secret_key.txt
+config_secret.py
