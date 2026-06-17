@@ -38,16 +38,19 @@ MODEL_PKL  = find_file("visitantalya_models.pkl")
 # Global bellek içi model nesneleri (Sadece ilk çalışmada yüklenir)
 state = None
 binaries = None
+model_error = None
 
 def load_models():
-    global state, binaries
+    global state, binaries, model_error
     try:
         with open(MODEL_JSON, "r", encoding="utf-8") as f:
             state = json.load(f)
         binaries = joblib.load(MODEL_PKL)
         print("Modeller belleğe başarıyla yüklendi. Ölçeklenebilirlik sağlandı.")
     except Exception as e:
-        print(f"HATA: Modeller yüklenemedi! {e}")
+        import traceback
+        model_error = traceback.format_exc()
+        print(f"HATA: Modeller yüklenemedi! {model_error}")
 
 load_models()
 
@@ -85,6 +88,9 @@ def logout():
 def predict():
     if not session.get("logged_in"):
         return jsonify({"success": False, "error": "Unauthorized"}), 401
+        
+    if binaries is None or state is None:
+        return jsonify({"success": False, "error": f"Sistem Hatası: Yapay zeka modeli yüklenemedi. Detay: {model_error}"}), 500
         
     try:
         data = request.json
