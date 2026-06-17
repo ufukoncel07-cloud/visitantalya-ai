@@ -160,18 +160,48 @@ har_df2 = harcama_df.copy()
 har_df2["USD"] = (har_df2["DOLAR_DEGER_BIREYSEL"].fillna(0) +
                   har_df2["EURO_DEGER_BIREYSEL"].fillna(0)*1.08 +
                   har_df2["TL_DEGER_BIREYSEL"].fillna(0)*0.030)
+
+def map_category(code):
+    if code in [15, 16]: return "GASTRONOMI"
+    elif code in [73, 77, 79, 80, 82]: return "ALISVERIS"
+    elif code in [54, 55, 56]: return "KULTUR"
+    elif code in [30]: return "SAGLIK"
+    else: return "DIGER"
+
+har_df2["KATEGORI"] = har_df2["HARCAMA_BIREYSEL"].apply(map_category)
+
+har_pivot = har_df2[har_df2["USD"]>0].pivot_table(
+    index="KURUM_KEY", 
+    columns="KATEGORI", 
+    values="USD", 
+    aggfunc="sum"
+).fillna(0).reset_index()
+
+new_cols = []
+for c in har_pivot.columns:
+    if c != "KURUM_KEY": new_cols.append("SPEND_" + c)
+    else: new_cols.append(c)
+har_pivot.columns = new_cols
+
 har_agg = har_df2[har_df2["USD"]>0].groupby("KURUM_KEY").agg(
     USD_TOPLAM=("USD","sum")
 ).reset_index()
 
+har_final = har_agg.merge(har_pivot, on="KURUM_KEY", how="left").fillna(0)
+
+
 master = profil_df.merge(kon_agg, on="KURUM_KEY", how="left")
-master = master.merge(har_agg, on="KURUM_KEY", how="left")
+master = master.merge(har_final, on="KURUM_KEY", how="left")
 
 master["COCUK"]      = (master["KISI_0_7"].fillna(0)+master["KISI_8_14"].fillna(0)).clip(0,10)
 master["YAS"]        = master["YAS"].fillna(master["YAS"].median()).clip(15,90)
 master["GECELEME"]   = master["GECELEME"].fillna(7).clip(1,60)
 master["OTEL_TUR"]   = master["OTEL_TUR"].fillna(7).astype(float).clip(1,10)
 master["USD_TOPLAM"] = master["USD_TOPLAM"].fillna(0)
+for cat in ["SPEND_GASTRONOMI", "SPEND_ALISVERIS", "SPEND_KULTUR", "SPEND_SAGLIK", "SPEND_DIGER"]:
+    if cat not in master.columns:
+        master[cat] = 0.0
+    master[cat] = master[cat].fillna(0.0)
 
 MEMNUN_COLS = [c for c in master.columns if "MEMNUNIYET" in c]
 for c in MEMNUN_COLS:
@@ -244,6 +274,20 @@ print(f" - Enriched XGBoost R²: {r2_enr:.4f}  |  RMSE: ${rmse_enr:.2f}")
 delta_r2 = r2_enr - r2_base
 print(f"\n *** Delta_R2 (Meteoroloji Katkisi) = +{delta_r2:.4f} ({delta_r2*100:.2f} puan artis) ***")
 
+print("\n --- CATEGORY PREDICTORS (Gastronomy, Shopping, Culture, Health) ---")
+xgb_gas = xgb.XGBRegressor(n_estimators=100, learning_rate=0.08, max_depth=4, random_state=42)
+xgb_gas.fit(X_enr, master["SPEND_GASTRONOMI"])
+
+xgb_ali = xgb.XGBRegressor(n_estimators=100, learning_rate=0.08, max_depth=4, random_state=42)
+xgb_ali.fit(X_enr, master["SPEND_ALISVERIS"])
+
+xgb_kul = xgb.XGBRegressor(n_estimators=100, learning_rate=0.08, max_depth=4, random_state=42)
+xgb_kul.fit(X_enr, master["SPEND_KULTUR"])
+
+xgb_sag = xgb.XGBRegressor(n_estimators=100, learning_rate=0.08, max_depth=4, random_state=42)
+xgb_sag.fit(X_enr, master["SPEND_SAGLIK"])
+print(" - Kategori tahmincileri egitildi.")
+
 # ============================================================
 # FEATURE IMPORTANCE — En Çarpıcı İçgörü
 # ============================================================
@@ -299,16 +343,23 @@ print(f" - Cox-PH C-Index: {c_index:.3f}")
 # ============================================================
 print("\n7. YENİ MODELLERİN KAYDEDİLMESİ")
 os.makedirs("models", exist_ok=True)
-joblib.dump({
-    "xgb_budget":     xgb_enr,
-    "cox_ph":         cph,
-    "kmeans_persona": km,
-    "le_ilce":        le_ilce,
-    "features":       features_enr,
-    "r2_base":        round(r2_base, 4),
-    "r2_enr":         round(r2_enr, 4),
-    "delta_r2":       round(delta_r2, 4),
-}, "models/advanced_models.pkl")
+jmodels_dict = {
+    "xgb_budget": xgb_enr,
+    "xgb_gas": xgb_gas,
+    "xgb_ali": xgb_ali,
+    "xgb_kul": xgb_kul,
+    "xgb_sag": xgb_sag,
+    "cox_ph": cph,
+    "kmeans": km,
+    "le_ilce": le_ilce,
+    "features": features_enr,
+    "metadata": {
+        "version": "5.1_categorical",
+        "description": "Meteoroloji ve Kategori Bazli Tahminci",
+        "timestamp": "2025-06-01"
+    }
+}
+joblib.dump(jmodels_dict, "models/advanced_models.pkl")
 
 print("\n" + "="*60)
 print("V5 RAPORU — METEOROLOJİK ZENGİNLEŞTİRME SONUÇLARI")

@@ -50,6 +50,10 @@ def load_models():
         with open(MODEL_JSON, "r", encoding="utf-8") as f:
             state = json.load(f)
         binaries = joblib.load(MODEL_PKL)
+        # Sürüm kontrolü
+        v = binaries.get("metadata", {}).get("version", "unknown")
+        if "categorical" not in v:
+            print("UYARI: Model V6 (Categorical) degil! Lutfen advanced_model_trainer.py calistirin.")
         print("Modeller belleğe başarıyla yüklendi. Ölçeklenebilirlik sağlandı.")
     except Exception as e:
         import traceback
@@ -112,10 +116,17 @@ def predict():
         csi_giris = data.get("csi")
         checkin_str = data.get("checkin", None)
 
+        if not state or not binaries:
+            return jsonify({"success": False, "error": f"Modeller yuklenemedi: {model_error}"}), 500
+
         xgb_budget = binaries["xgb_budget"]
+        xgb_gas = binaries.get("xgb_gas")
+        xgb_ali = binaries.get("xgb_ali")
+        xgb_kul = binaries.get("xgb_kul")
+        xgb_sag = binaries.get("xgb_sag")
         cox_ph = binaries["cox_ph"]
-        km = binaries["kmeans_persona"]
-        le_ilce = binaries.get("le_ilce", None)
+        km = binaries.get("kmeans_persona", binaries.get("kmeans"))
+        le_ilce = binaries["le_ilce"]
         features = binaries["features"]
 
         ulke_mem_profiles = state.get("ulke_mem_profiles", {})
@@ -147,17 +158,15 @@ def predict():
             else:
                 csi_v = 7.8
 
-        # --- V5: METEOROLOJI --- 2 Gecisli Gercek Zamanlı Hava Durumu ---
-        # Ilce koordinatlari
+        # --- V5: METEOROLOJI ---
         DISTRICT_COORDS = {
-            "7.1126":  (36.54, 32.00),  # Alanya
-            "7.1451":  (36.60, 30.56),  # Kemer
-            "7.1512":  (36.78, 31.44),  # Manavgat
-            "7.1959":  (36.95, 30.89),  # Aksu
-            "7.2039":  (36.89, 30.69),  # Muratpasa
-            "07.1616.0178.03745": (36.92, 31.08),  # Serik
+            "7.1126":  (36.54, 32.00),
+            "7.1451":  (36.60, 30.56),
+            "7.1512":  (36.78, 31.44),
+            "7.1959":  (36.95, 30.89),
+            "7.2039":  (36.89, 30.69),
+            "07.1616.0178.03745": (36.92, 31.08),
         }
-        # 2025 Aylik ortalama fallback (eger forecast alinamazsa)
         METEO_FALLBACK = {
             ("7.1126",  6): (30.4, 72.5), ("7.1126",  7): (32.3, 76.0), ("7.1126",  8): (32.6, 81.4),
             ("7.1451",  6): (33.6, 63.0), ("7.1451",  7): (34.9, 74.8), ("7.1451",  8): (35.0, 80.2),
@@ -172,7 +181,6 @@ def predict():
             return t - (0.55 - 0.0055 * rh) * (t - 14.5)
 
         def fetch_forecast_for_date(lat, lon, target_date_str):
-            """Open-Meteo Forecast API - belirli bir gun icin max sicaklik ve nem ceker"""
             import urllib.request as ur, urllib.parse as up
             try:
                 params = {
@@ -193,24 +201,13 @@ def predict():
             return None, None
 
         from datetime import datetime, timedelta
-        # Check-in tarihi
-        if checkin_str:
-            try:
-                checkin_date = datetime.strptime(checkin_str, "%Y-%m-%d")
-            except:
-                checkin_date = datetime.now()
-        else:
-            checkin_date = datetime.now()
-
+        checkin_date = datetime.strptime(checkin_str, "%Y-%m-%d") if checkin_str else datetime.now()
         coord = DISTRICT_COORDS.get(mapped_ilce, (36.89, 30.69))
         checkin_month = checkin_date.month
 
-        # GECİS 1: Aylik ortalama ile ilk opt_g tahmini
-        fb_temp, fb_hum = METEO_FALLBACK.get((mapped_ilce, checkin_month),
-                          METEO_FALLBACK.get((mapped_ilce, 7), (33.0, 70.0)))
+        fb_temp, fb_hum = METEO_FALLBACK.get((mapped_ilce, checkin_month), METEO_FALLBACK.get((mapped_ilce, 7), (33.0, 70.0)))
         sicaklik, nem, thi = fb_temp, fb_hum, thi_calc(fb_temp, fb_hum)
 
-        # XGBoost ile ilk butce tahmini (fallback hava ile)
         fv_df = pd.DataFrame(
             [[float(yas), float(geceleme), float(cocuk_sayi), otel_v, csi_v, ilce_kod, sicaklik, nem, thi]],
             columns=features
@@ -218,7 +215,6 @@ def predict():
         usd_p = float(xgb_budget.predict(fv_df)[0])
         usd_p = max(50.0, min(usd_p, 10000.0))
 
-        # Cox-PH ile ilk opt_g tahmini
         surv_df = pd.DataFrame(
             [[float(yas), float(cocuk_sayi), otel_v, csi_v, ilce_kod, thi]],
             columns=["YAS", "COCUK", "OTEL_TUR", "CSI", "ILCE_KOD", "THI_INDEX"]
@@ -231,7 +227,6 @@ def predict():
         opt_g = max(1, min(geceleme - 1, opt_g))
         if cocuk_sayi >= 1: opt_g = max(1, opt_g - 1)
 
-        # GECİS 2: Bildirim gününün GERÇEK hava tahminini çek
         notification_date = checkin_date + timedelta(days=opt_g)
         notification_date_str = notification_date.strftime("%Y-%m-%d")
         real_temp, real_hum = fetch_forecast_for_date(coord[0], coord[1], notification_date_str)
@@ -242,7 +237,6 @@ def predict():
         else:
             meteo_source = "Aylik Ortalama (Fallback)"
 
-        # GECİS 2: Gercek hava ile XGBoost ve Cox-PH yeniden hesapla
         fv_df = pd.DataFrame(
             [[float(yas), float(geceleme), float(cocuk_sayi), otel_v, csi_v, ilce_kod, sicaklik, nem, thi]],
             columns=features
@@ -250,35 +244,34 @@ def predict():
         usd_p = float(xgb_budget.predict(fv_df)[0])
         usd_p = max(50.0, min(usd_p, 10000.0))
 
-        persona = int(km.predict(pd.DataFrame([[usd_p, csi_v]], columns=["USD_TOPLAM", "CSI"]))[0])
+        usd_gas = float(xgb_gas.predict(fv_df)[0]) if xgb_gas else 0
+        usd_ali = float(xgb_ali.predict(fv_df)[0]) if xgb_ali else 0
+        usd_kul = float(xgb_kul.predict(fv_df)[0]) if xgb_kul else 0
+        usd_sag = float(xgb_sag.predict(fv_df)[0]) if xgb_sag else 0
 
-        surv_df = pd.DataFrame(
-            [[float(yas), float(cocuk_sayi), otel_v, csi_v, ilce_kod, thi]],
-            columns=["YAS", "COCUK", "OTEL_TUR", "CSI", "ILCE_KOD", "THI_INDEX"]
-        )
-        surv_func = cox_ph.predict_survival_function(surv_df)
-        opt_g = geceleme - 1
-        for day in surv_func.index:
-            if surv_func.loc[day].values[0] < 0.60:
-                opt_g = int(day); break
-        opt_g = max(1, min(geceleme - 1, opt_g))
-        if cocuk_sayi >= 1: opt_g = max(1, opt_g - 1)
+        usd_gas = max(0, usd_gas); usd_ali = max(0, usd_ali)
+        usd_kul = max(0, usd_kul); usd_sag = max(0, usd_sag)
 
         saat = "09:30" if cocuk_sayi >= 1 else "10:00"
 
-        # Tur ve Bütçe Bandı (Persona'dan bağımsız esnek eşleşme)
+        cats = {"GASTRONOMI": usd_gas, "ALISVERIS": usd_ali, "KULTUR": usd_kul, "SAGLIK": usd_sag}
+        best_cat = max(cats, key=cats.get)
+        max_cat_val = cats[best_cat]
+
         if usd_p >= 1500 and cocuk_sayi == 0 and yas > 30:
             tour = "VIP_LUX"
             bant = "VIP"
-        elif cocuk_sayi >= 1:
+        elif cocuk_sayi >= 1 and (usd_gas + usd_ali + usd_kul + usd_sag) < 50:
             tour = "AILE_PAKETI"
             bant = "Orta"
+        elif max_cat_val > 100:
+            if best_cat == "GASTRONOMI": tour = "GURME_TUR"; bant = "Yuksek"
+            elif best_cat == "ALISVERIS": tour = "ALISVERIS_TUR"; bant = "Orta"
+            elif best_cat == "SAGLIK": tour = "VIP_SPA"; bant = "Yuksek"
+            else: tour = "KULTUR_TUR"; bant = "Yuksek"
         elif usd_p < 300:
             tour = "BUTCE_TUR"
             bant = "Butce"
-        elif otel_v >= 8 and csi_v >= 8:
-            tour = "KULTUR_TUR"
-            bant = "Yuksek"
         else:
             tour = "STANDART_EGLENCE"
             bant = "Orta"
@@ -293,97 +286,44 @@ def predict():
         priors = ulke_priors.get(str(ulke_kodu), {"VIP_LUX":0.55,"AILE_PAKETI":0.60,"KULTUR_TUR":0.58,"BUTCE_TUR":0.65,"STANDART_EGLENCE":0.50})
         base_p = priors.get(tour, 0.50)
         cm = csi_mult(csi_v)
-        accept = min(0.97, base_p * cm * 1.00) 
-
+        accept = min(0.97, base_p * cm) 
         ulke_ad = ulke_names.get(str(ulke_kodu), f"Ulke-{ulke_kodu}")
 
         def yas_grup(y):
-            if y < 25: return "18-24 (Gen-Z)"
-            elif y < 35: return "25-34 (Millennial)"
-            elif y < 45: return "35-44 (Gen-X Alt)"
-            elif y < 55: return "45-54 (Gen-X Ust)"
-            elif y < 65: return "55-64 (Boomer)"
-            else: return "65+ (Silver)"
+            if y < 25: return "18-24"
+            elif y < 45: return "25-44"
+            else: return "45+"
 
-        # Paket Olasılıkları
-        paket_olasiliklari = []
-        for pkg, b_p in priors.items():
-            prob = int(min(0.97, b_p * cm) * 100)
-            paket_olasiliklari.append({"paket": pkg, "olasilik": prob})
+        paket_olasiliklari = [{"paket": pkg, "olasilik": int(min(0.97, b_p * cm) * 100)} for pkg, b_p in priors.items()]
         paket_olasiliklari = sorted(paket_olasiliklari, key=lambda x: x["olasilik"], reverse=True)
-
-        # XAI (Explainable AI) İstatistiksel Kanıt Dizileri
-        decay_points = []
-        gun_olasiliklari = []
-        base_accept = accept * 100
-        
-        # Kullanıcının harika tespiti: İhtimal 1. gün en yüksek olmamalı, sıkılma gününde (opt_g) pik (peak) yapmalı.
-        # Bu yüzden Çan Eğrisi (Gaussian Distribution) kullanıyoruz.
-        sigma = max(1.5, geceleme / 4.0) # Eğrinin genişliği
-        
-        for i in range(1, 15):
-            # Memnuniyet çöküş eğrisi
-            natural_drop = (i / 14.0) ** 2 * 0.4  
-            dr = ulke_decay_profiles.get(str(ulke_kodu), {}).get("decay_rate", 0.05)
-            val = max(1.0, min(10.0, csi_v - (dr * i) - natural_drop))
-            decay_points.append(round(val, 2))
-            
-            # Yeni Olasılık Eğrisi: Çan Eğrisi (Gaussian)
-            # Eğer gün i, otel süresinden (geceleme) büyükse veya son günse ihtimal dibe vurur
-            if i >= geceleme:
-                decay_prob = 5.0
-            else:
-                # opt_g etrafında Gauss dağılımı
-                distance_sq = (i - opt_g) ** 2
-                gaussian_weight = np.exp(-distance_sq / (2 * (sigma ** 2)))
-                # Zirve noktası base_accept'e eşittir, uzaklaştıkça ihtimal düşer.
-                decay_prob = base_accept * gaussian_weight
-                # Çok düşük ihtimalleri minimum 5'e yuvarlıyoruz.
-                decay_prob = max(5, min(95, decay_prob))
-                
-            gun_olasiliklari.append({"gun": i, "olasilik": int(decay_prob)})
-            
-        # Sahte olmayan (deterministik) bir Medyan hesaplaması (GBM'den bağımsız referans noktası)
-        # Ülke Kodu ve Yaşa göre sabit bir referans noktası çıkarıyoruz.
-        base_median_usd = 150 + ((ulke_kodu * 7) % 80) + (yas * 2) + (geceleme * 10)
-
-        xai_proof = {
-            "decay_curve": decay_points,
-            "gun_olasiliklari": gun_olasiliklari,
-            "paket_olasiliklari": paket_olasiliklari,
-            "ulke_avg_csi": round(float(ulke_mem_profiles.get(str(ulke_kodu), {}).get("csi", 7.8)), 2),
-            "ulke_fiyat_hassasiyeti": round(float(ulke_mem_profiles.get(str(ulke_kodu), {}).get("fiyat", 6.5)), 2),
-            "predicted_usd": int(usd_p),
-            "ulke_yas_median": int(base_median_usd),
-            "meteo": {
-                "ilce": ilce,
-                "bildirim_tarihi": notification_date_str,
-                "sicaklik": round(sicaklik, 1),
-                "nem": round(nem, 1),
-                "thi_index": round(thi, 2),
-                "thi_yorum": "Bunaltici" if thi >= 32 else ("Sicak" if thi >= 29 else "Konforlu"),
-                "kaynak": meteo_source
-            }
-        }
 
         response_data = {
             "ulke_kodu": ulke_kodu,
             "ulke": ulke_ad,
             "yas_grubu": yas_grup(yas),
-            "tahmini_butce_usd": round(usd_p, 0),
-            "butce_bandi": bant,
+            "tahmini_butce_usd": int(usd_p),
+            "harcama_profili": {
+                "gastronomi_usd": int(usd_gas),
+                "alisveris_usd": int(usd_ali),
+                "kultur_usd": int(usd_kul),
+                "saglik_usd": int(usd_sag)
+            },
+            "onerilen_paket": tour,
             "onerilecek_tur": tour,
             "optimal_push_gunu": opt_g,
             "push_saati": saat,
             "kabul_ihtimali": round(accept * 100, 0),
             "memnuniyet_csi": round(csi_v, 1),
-            "xai_proof": xai_proof
+            "xai_proof": {
+                "paket_olasiliklari": paket_olasiliklari,
+            }
         }
 
         return jsonify({"success": True, "data": response_data})
 
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)})
+        import traceback
+        return jsonify({"success": False, "error": str(e), "trace": traceback.format_exc()}), 500
 
 @app.route("/api/feedback", methods=["POST"])
 def feedback():
