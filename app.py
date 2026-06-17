@@ -23,10 +23,17 @@ app.secret_key = "visitantalya_super_secret_key_2026"  # Güvenlik anahtarı
 import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# Model Yolları
-model_dir = "modeller" if os.path.exists(os.path.join(BASE_DIR, "modeller")) else "models"
-MODEL_JSON = os.path.join(BASE_DIR, model_dir, "model_state_v31.json")
-MODEL_PKL  = os.path.join(BASE_DIR, model_dir, "visitantalya_models.pkl")
+# Model Yolları - Yok Edilemez Arama Motoru
+def find_file(filename):
+    if os.path.exists(os.path.join(BASE_DIR, filename)):
+        return os.path.join(BASE_DIR, filename)
+    for root, _, files in os.walk(BASE_DIR):
+        if filename in files:
+            return os.path.join(root, filename)
+    return os.path.join(BASE_DIR, "models", filename)
+
+MODEL_JSON = find_file("model_state_v31.json")
+MODEL_PKL  = find_file("visitantalya_models.pkl")
 
 # Global bellek içi model nesneleri (Sadece ilk çalışmada yüklenir)
 state = None
