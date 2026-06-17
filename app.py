@@ -15,10 +15,12 @@ import json
 import joblib
 import numpy as np
 import pandas as pd
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for, send_file
+from datetime import timedelta
 
 app = Flask(__name__)
 app.secret_key = "visitantalya_super_secret_key_2026"  # Güvenlik anahtarı
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(minutes=5)
 
 import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -67,12 +69,17 @@ def index():
     }
     return render_template("index.html", stats=stats)
 
+@app.route("/icon.png")
+def serve_icon():
+    return send_file(find_file("icon.png"), mimetype='image/png')
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     error = None
     if request.method == "POST":
         password = request.form.get("password")
         if password == "!Asd12345678":
+            session.permanent = True
             session["logged_in"] = True
             return redirect(url_for("index"))
         else:
@@ -197,13 +204,26 @@ def predict():
             elif y < 65: return "55-64 (Boomer)"
             else: return "65+ (Silver)"
 
+        # Paket Olasılıkları
+        paket_olasiliklari = []
+        for pkg, b_p in priors.items():
+            prob = int(min(0.97, b_p * cm) * 100)
+            paket_olasiliklari.append({"paket": pkg, "olasilik": prob})
+        paket_olasiliklari = sorted(paket_olasiliklari, key=lambda x: x["olasilik"], reverse=True)
+
         # XAI (Explainable AI) İstatistiksel Kanıt Dizileri
         decay_points = []
+        gun_olasiliklari = []
+        base_accept = accept * 100
         # Doğal yorulma payı (Natural fatigue): Sona doğru hafif eğim katmak için
         for i in range(1, 15):
             natural_drop = (i / 14.0) ** 2 * 0.4  # 14. günde max 0.4 puanlık doğal düşüş
             val = max(1.0, min(10.0, csi_v - (dr * i) - natural_drop))
             decay_points.append(round(val, 2))
+            
+            prob_drop = (i / 14.0) ** 2 * 10
+            decay_prob = max(10, min(95, base_accept - (i * dr * 20) - prob_drop))
+            gun_olasiliklari.append({"gun": i, "olasilik": int(decay_prob)})
             
         # Sahte olmayan (deterministik) bir Medyan hesaplaması (GBM'den bağımsız referans noktası)
         # Ülke Kodu ve Yaşa göre sabit bir referans noktası çıkarıyoruz.
@@ -211,6 +231,8 @@ def predict():
 
         xai_proof = {
             "decay_curve": decay_points,
+            "gun_olasiliklari": gun_olasiliklari,
+            "paket_olasiliklari": paket_olasiliklari,
             "ulke_avg_csi": round(float(ulke_mem_profiles.get(str(ulke_kodu), {}).get("csi", 7.8)), 2),
             "ulke_fiyat_hassasiyeti": round(float(ulke_mem_profiles.get(str(ulke_kodu), {}).get("fiyat", 6.5)), 2),
             "predicted_usd": int(usd_p),
