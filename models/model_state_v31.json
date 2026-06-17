@@ -1,0 +1,394 @@
+{
+  "versiyon": "3.1",
+  "veri_kaydi": 31848,
+  "r2_cv": -0.06788695504241807,
+  "mae_cv": 233.35123354149627,
+  "low_thresh": 162.0,
+  "mid_thresh": 378.0,
+  "high_thresh": 788.4,
+  "ulke_mem_profiles": {
+    "4": {
+      "ad": "ALMANYA",
+      "csi": 7.923,
+      "fiyat": 6.192,
+      "yeme": 7.99,
+      "konaklama": 8.619,
+      "guvenlik": 8.229,
+      "n": 5895
+    },
+    "75": {
+      "ad": "RUSYA",
+      "csi": 8.209,
+      "fiyat": 6.558,
+      "yeme": 8.128,
+      "konaklama": 8.711,
+      "guvenlik": 8.662,
+      "n": 5789
+    },
+    "60": {
+      "ad": "POLONYA",
+      "csi": 8.348,
+      "fiyat": 7.162,
+      "yeme": 8.239,
+      "konaklama": 8.734,
+      "guvenlik": 8.483,
+      "n": 3825
+    },
+    "6": {
+      "ad": "İNGİLTERE",
+      "csi": 7.738,
+      "fiyat": 7.084,
+      "yeme": 7.669,
+      "konaklama": 8.061,
+      "guvenlik": 7.839,
+      "n": 2422
+    },
+    "79": {
+      "ad": "KAZAKİSTAN",
+      "csi": 8.008,
+      "fiyat": 5.864,
+      "yeme": 7.867,
+      "konaklama": 8.584,
+      "guvenlik": 8.656,
+      "n": 2055
+    },
+    "66": {
+      "ad": "ROMANYA",
+      "csi": 8.854,
+      "fiyat": 8.968,
+      "yeme": 8.735,
+      "konaklama": 8.836,
+      "guvenlik": 9.312,
+      "n": 1391
+    },
+    "8": {
+      "ad": "DANİMARKA",
+      "csi": 7.478,
+      "fiyat": 7.556,
+      "yeme": 7.558,
+      "konaklama": 7.742,
+      "guvenlik": 7.612,
+      "n": 1286
+    },
+    "17": {
+      "ad": "BELÇİKA",
+      "csi": 7.906,
+      "fiyat": 7.141,
+      "yeme": 7.769,
+      "konaklama": 8.539,
+      "guvenlik": 8.013,
+      "n": 1226
+    },
+    "3": {
+      "ad": "HOLLANDA",
+      "csi": 7.673,
+      "fiyat": 7.039,
+      "yeme": 7.635,
+      "konaklama": 8.37,
+      "guvenlik": 7.755,
+      "n": 1178
+    },
+    "39": {
+      "ad": "İSVİÇRE",
+      "csi": 7.711,
+      "fiyat": 6.354,
+      "yeme": 7.945,
+      "konaklama": 8.342,
+      "guvenlik": 7.802,
+      "n": 1080
+    },
+    "38": {
+      "ad": "AVUSTURYA",
+      "csi": 7.866,
+      "fiyat": 5.837,
+      "yeme": 7.839,
+      "konaklama": 8.584,
+      "guvenlik": 8.25,
+      "n": 994
+    },
+    "1": {
+      "ad": "FRANSA",
+      "csi": 7.66,
+      "fiyat": 6.342,
+      "yeme": 7.519,
+      "konaklama": 8.144,
+      "guvenlik": 8.297,
+      "n": 939
+    },
+    "30": {
+      "ad": "İSVEÇ",
+      "csi": 7.41,
+      "fiyat": 6.826,
+      "yeme": 7.27,
+      "konaklama": 7.968,
+      "guvenlik": 7.546,
+      "n": 803
+    },
+    "78": {
+      "ad": "AZERBAYCAN",
+      "csi": 8.257,
+      "fiyat": 6.568,
+      "yeme": 8.553,
+      "konaklama": 9.108,
+      "guvenlik": 8.378,
+      "n": 501
+    },
+    "28": {
+      "ad": "NORVEÇ",
+      "csi": 7.48,
+      "fiyat": 7.259,
+      "yeme": 7.592,
+      "konaklama": 7.892,
+      "guvenlik": 7.899,
+      "n": 400
+    }
+  },
+  "ulke_priors": {
+    "4": {
+      "VIP_LUX": 0.518,
+      "AILE_PAKETI": 0.654,
+      "KULTUR_TUR": 0.614,
+      "BUTCE_TUR": 0.717,
+      "STANDART_EGLENCE": 0.534
+    },
+    "75": {
+      "VIP_LUX": 0.56,
+      "AILE_PAKETI": 0.677,
+      "KULTUR_TUR": 0.637,
+      "BUTCE_TUR": 0.73,
+      "STANDART_EGLENCE": 0.557
+    },
+    "60": {
+      "VIP_LUX": 0.601,
+      "AILE_PAKETI": 0.688,
+      "KULTUR_TUR": 0.648,
+      "BUTCE_TUR": 0.726,
+      "STANDART_EGLENCE": 0.568
+    },
+    "6": {
+      "VIP_LUX": 0.548,
+      "AILE_PAKETI": 0.639,
+      "KULTUR_TUR": 0.599,
+      "BUTCE_TUR": 0.679,
+      "STANDART_EGLENCE": 0.519
+    },
+    "79": {
+      "VIP_LUX": 0.509,
+      "AILE_PAKETI": 0.661,
+      "KULTUR_TUR": 0.621,
+      "BUTCE_TUR": 0.732,
+      "STANDART_EGLENCE": 0.541
+    },
+    "66": {
+      "VIP_LUX": 0.732,
+      "AILE_PAKETI": 0.728,
+      "KULTUR_TUR": 0.688,
+      "BUTCE_TUR": 0.722,
+      "STANDART_EGLENCE": 0.608
+    },
+    "8": {
+      "VIP_LUX": 0.551,
+      "AILE_PAKETI": 0.618,
+      "KULTUR_TUR": 0.578,
+      "BUTCE_TUR": 0.647,
+      "STANDART_EGLENCE": 0.498
+    },
+    "17": {
+      "VIP_LUX": 0.565,
+      "AILE_PAKETI": 0.653,
+      "KULTUR_TUR": 0.613,
+      "BUTCE_TUR": 0.691,
+      "STANDART_EGLENCE": 0.533
+    },
+    "3": {
+      "VIP_LUX": 0.541,
+      "AILE_PAKETI": 0.634,
+      "KULTUR_TUR": 0.594,
+      "BUTCE_TUR": 0.675,
+      "STANDART_EGLENCE": 0.514
+    },
+    "39": {
+      "VIP_LUX": 0.51,
+      "AILE_PAKETI": 0.637,
+      "KULTUR_TUR": 0.597,
+      "BUTCE_TUR": 0.696,
+      "STANDART_EGLENCE": 0.517
+    }
+  },
+  "ulke_push_days": {
+    "4": {
+      "opt_gun": 4,
+      "csi_mult": 1.0
+    },
+    "75": {
+      "opt_gun": 4,
+      "csi_mult": 1.1
+    },
+    "60": {
+      "opt_gun": 4,
+      "csi_mult": 1.1
+    },
+    "6": {
+      "opt_gun": 3,
+      "csi_mult": 1.0
+    },
+    "79": {
+      "opt_gun": 4,
+      "csi_mult": 1.1
+    },
+    "66": {
+      "opt_gun": 3,
+      "csi_mult": 1.1
+    },
+    "8": {
+      "opt_gun": 4,
+      "csi_mult": 1.0
+    },
+    "17": {
+      "opt_gun": 4,
+      "csi_mult": 1.0
+    },
+    "3": {
+      "opt_gun": 4,
+      "csi_mult": 1.0
+    },
+    "39": {
+      "opt_gun": 3,
+      "csi_mult": 1.0
+    }
+  },
+  "ulke_decay_profiles": {
+    "4": {
+      "decay_rate": 0,
+      "c7": 7.937,
+      "c10": 8.008,
+      "c14": 7.844,
+      "trend": "Sabit        →"
+    },
+    "75": {
+      "decay_rate": 0,
+      "c7": 8.18,
+      "c10": 8.308,
+      "c14": 8.171,
+      "trend": "Sabit        →"
+    },
+    "60": {
+      "decay_rate": 0,
+      "c7": 8.319,
+      "c10": 8.605,
+      "c14": 8.618,
+      "trend": "Sabit        →"
+    },
+    "6": {
+      "decay_rate": 0.104,
+      "c7": 7.952,
+      "c10": 7.639,
+      "c14": 7.493,
+      "trend": "HIZLI DUSUS  ↓↓"
+    },
+    "79": {
+      "decay_rate": 0,
+      "c7": 8.128,
+      "c10": 8.187,
+      "c14": 7.744,
+      "trend": "Sabit        →"
+    },
+    "66": {
+      "decay_rate": 0.096,
+      "c7": 8.848,
+      "c10": 8.56,
+      "c14": 7.983,
+      "trend": "Yavash Dusus ↓"
+    },
+    "8": {
+      "decay_rate": 0,
+      "c7": 7.407,
+      "c10": 8.139,
+      "c14": 7.456,
+      "trend": "ARTIYOR      ↑↑"
+    },
+    "17": {
+      "decay_rate": 0.04,
+      "c7": 7.918,
+      "c10": 7.797,
+      "c14": 8.022,
+      "trend": "Yavash Dusus ↓"
+    },
+    "3": {
+      "decay_rate": 0.013,
+      "c7": 7.697,
+      "c10": 7.659,
+      "c14": 7.576,
+      "trend": "Yavash Dusus ↓"
+    },
+    "39": {
+      "decay_rate": 0.08,
+      "c7": 7.843,
+      "c10": 7.603,
+      "c14": 7.91,
+      "trend": "Yavash Dusus ↓"
+    }
+  },
+  "ulke_names": {
+    "4": "ALMANYA",
+    "75": "RUSYA",
+    "60": "POLONYA",
+    "6": "İNGİLTERE",
+    "79": "KAZAKİSTAN",
+    "66": "ROMANYA",
+    "8": "DANİMARKA",
+    "17": "BELÇİKA",
+    "3": "HOLLANDA",
+    "39": "İSVİÇRE",
+    "38": "AVUSTURYA",
+    "1": "FRANSA",
+    "30": "İSVEÇ",
+    "78": "AZERBAYCAN",
+    "28": "NORVEÇ"
+  },
+  "yas_grup_profiles": {
+    "18-24 (Gen-Z)": {
+      "csi": 7.8,
+      "usd": 651.04,
+      "gece": 7.69,
+      "cocuk": 0.2,
+      "n": 4417
+    },
+    "25-34 (Millennial)": {
+      "csi": 7.92,
+      "usd": 651.19,
+      "gece": 7.62,
+      "cocuk": 0.45,
+      "n": 6687
+    },
+    "35-44 (Gen-X Alt)": {
+      "csi": 8.11,
+      "usd": 696.69,
+      "gece": 7.9,
+      "cocuk": 0.85,
+      "n": 10227
+    },
+    "45-54 (Gen-X Ust)": {
+      "csi": 8.19,
+      "usd": 730.03,
+      "gece": 8.12,
+      "cocuk": 0.55,
+      "n": 6064
+    },
+    "55-64 (Boomer)": {
+      "csi": 8.33,
+      "usd": 710.46,
+      "gece": 8.6,
+      "cocuk": 0.24,
+      "n": 3047
+    },
+    "65+ (Silver)": {
+      "csi": 8.43,
+      "usd": 721.29,
+      "gece": 9.28,
+      "cocuk": 0.2,
+      "n": 1406
+    }
+  },
+  "ogrenme_log": []
+}
