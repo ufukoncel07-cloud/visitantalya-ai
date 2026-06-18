@@ -128,7 +128,8 @@ def predict():
         km = binaries.get("kmeans_persona", binaries.get("kmeans"))
         le_ilce = binaries["le_ilce"]
         features = binaries["features"]
-
+        ulke_otel_skor_dict = binaries.get("ulke_otel_skor_dict", {})
+        global_median_score = binaries.get("global_median_score", 150.0)
         ulke_mem_profiles = state.get("ulke_mem_profiles", {})
         ulke_priors = state.get("ulke_priors", {})
         ulke_decay_profiles = state.get("ulke_decay_profiles", {})
@@ -210,16 +211,18 @@ def predict():
         fb_temp, fb_hum = METEO_FALLBACK.get((mapped_ilce, checkin_month), METEO_FALLBACK.get((mapped_ilce, 7), (33.0, 70.0)))
         sicaklik, nem, thi = fb_temp, fb_hum, thi_calc(fb_temp, fb_hum)
 
+        uyruk_otel_skoru = ulke_otel_skor_dict.get((ulke_kodu, otel_v), global_median_score)
+
         fv_df = pd.DataFrame(
-            [[float(yas), float(geceleme), float(cocuk_sayi), otel_v, csi_v, ilce_kod, sicaklik, nem, thi]],
+            [[float(yas), float(geceleme), float(cocuk_sayi), otel_v, uyruk_otel_skoru, csi_v, ilce_kod, sicaklik, nem, thi]],
             columns=features
         )
         usd_p = float(xgb_budget.predict(fv_df)[0])
         usd_p = max(50.0, min(usd_p, 10000.0))
 
         surv_df = pd.DataFrame(
-            [[float(yas), float(cocuk_sayi), otel_v, csi_v, ilce_kod, thi]],
-            columns=["YAS", "COCUK", "OTEL_TUR", "CSI", "ILCE_KOD", "THI_INDEX"]
+            [[float(yas), float(cocuk_sayi), otel_v, uyruk_otel_skoru, csi_v, ilce_kod, thi]],
+            columns=["YAS", "COCUK", "OTEL_TUR", "UYRUK_OTEL_SKORU", "CSI", "ILCE_KOD", "THI_INDEX"]
         )
         surv_func = cox_ph.predict_survival_function(surv_df)
         opt_g = geceleme - 1

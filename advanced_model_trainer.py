@@ -217,6 +217,16 @@ if "AY" not in master.columns and "REFERANS_AY" in master.columns:
 le_ilce = LabelEncoder()
 master["ILCE_KOD"] = le_ilce.fit_transform(master["ILCE"].astype(str))
 
+# Uyruk x Otel Türü Etkileşim Skoru (Target Encoding)
+master["UYRUK_ULKE"] = master["UYRUK_ULKE"].fillna(4).astype(int)
+uyruk_otel_agg = master[master["USD_TOPLAM"] > 0].groupby(["UYRUK_ULKE", "OTEL_TUR"])["USD_TOPLAM"].median().reset_index()
+uyruk_otel_agg.rename(columns={"USD_TOPLAM": "UYRUK_OTEL_SKORU"}, inplace=True)
+
+master = master.merge(uyruk_otel_agg, on=["UYRUK_ULKE", "OTEL_TUR"], how="left")
+global_median_score = master[master["USD_TOPLAM"] > 0]["USD_TOPLAM"].median()
+master["UYRUK_OTEL_SKORU"] = master["UYRUK_OTEL_SKORU"].fillna(global_median_score)
+
+ulke_otel_skor_dict = uyruk_otel_agg.set_index(["UYRUK_ULKE", "OTEL_TUR"])["UYRUK_OTEL_SKORU"].to_dict()
 # ============================================================
 # ADIM 2: METEOROLOJİK VERİLERİ ANA TABLOYA MERGE ET
 # ============================================================
@@ -244,7 +254,7 @@ master["PERSONA"] = km.fit_predict(b_data)
 # ============================================================
 print("\n4. KARŞILAŞTIRMALI MODEL EĞİTİMİ")
 print(" --- BASELINE (Meteorolojisiz) ---")
-features_base = ["YAS", "GECELEME", "COCUK", "OTEL_TUR", "CSI", "ILCE_KOD"]
+features_base = ["YAS", "GECELEME", "COCUK", "OTEL_TUR", "UYRUK_OTEL_SKORU", "CSI", "ILCE_KOD"]
 X_base = master[features_base].copy()
 y = master["USD_TOPLAM"]
 
@@ -259,7 +269,7 @@ print(f" - Baseline XGBoost R² : {r2_base:.4f}  |  RMSE: ${rmse_base:.2f}")
 # ADIM 3B: ENRİCHED MODEL (meteoroloji ile)
 # ============================================================
 print(" --- ENRİCHED MODEL (Meteoroloji Dahil) ---")
-features_enr = ["YAS", "GECELEME", "COCUK", "OTEL_TUR", "CSI", "ILCE_KOD",
+features_enr = ["YAS", "GECELEME", "COCUK", "OTEL_TUR", "UYRUK_OTEL_SKORU", "CSI", "ILCE_KOD",
                  "SICAKLIK", "NEM", "THI_INDEX"]
 X_enr = master[features_enr].copy()
 
@@ -332,7 +342,7 @@ def sim_duration(r):
 
 master["DURATION"] = master.apply(sim_duration, axis=1)
 
-surv_data = master[["DURATION","EVENT","YAS","COCUK","OTEL_TUR","CSI","ILCE_KOD","THI_INDEX"]].copy()
+surv_data = master[["DURATION","EVENT","YAS","COCUK","OTEL_TUR","UYRUK_OTEL_SKORU","CSI","ILCE_KOD","THI_INDEX"]].copy()
 cph = CoxPHFitter(penalizer=0.1)
 cph.fit(surv_data, duration_col='DURATION', event_col='EVENT')
 c_index = cph.concordance_index_
@@ -352,6 +362,8 @@ jmodels_dict = {
     "cox_ph": cph,
     "kmeans": km,
     "le_ilce": le_ilce,
+    "ulke_otel_skor_dict": ulke_otel_skor_dict,
+    "global_median_score": global_median_score,
     "features": features_enr,
     "metadata": {
         "version": "5.1_categorical",
