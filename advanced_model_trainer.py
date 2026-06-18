@@ -250,25 +250,53 @@ b_data = master[["USD_TOPLAM","CSI"]].fillna(0)
 master["PERSONA"] = km.fit_predict(b_data)
 
 # ============================================================
-# ADIM 3A: SIFIR-ENFLASYONu GIDER — Sadece harcama yapan turistler
+# STAGE 1: SINIFLANDIRICI — Harcama Yapar mi? (Tum 31.848 kayit)
 # ============================================================
-print("\n4. KARSILASTIRMALI MODEL EGITIMI")
+print("\n4. TWO-STAGE HURDLE MODEL EGITiMi")
 print(f" - Toplam kayit: {len(master)}")
-master_nonzero = master[master["USD_TOPLAM"] > 0].copy()
-print(f" - Sifir-harcarma filtresi: {len(master_nonzero)} kayit kaldi ({100*len(master_nonzero)/len(master):.1f}%)")
+master_nonzero = master[master['USD_TOPLAM'] > 0].copy()
+print(f" - Harcama yapan: {len(master_nonzero)} kayit ({100*len(master_nonzero)/len(master):.1f}%)")
+print(f" - Sifir harcayan: {len(master)-len(master_nonzero)} kayit ({100*(len(master)-len(master_nonzero))/len(master):.1f}%)")
 
-# log(1+y) donusumu: Siddetli sag-carpikligi duzeltiyor (skewness 9.6 -> ~1.2)
-master_nonzero["LOG_USD"] = np.log1p(master_nonzero["USD_TOPLAM"])
-for cat in ["SPEND_GASTRONOMI", "SPEND_ALISVERIS", "SPEND_KULTUR", "SPEND_SAGLIK"]:
-    master_nonzero[f"LOG_{cat}"] = np.log1p(master_nonzero[cat])
+# Hedef: binary 0/1
+master['HARCAMA_YAPTI'] = (master['USD_TOPLAM'] > 0).astype(int)
 
-y_log     = master_nonzero["LOG_USD"]
-y_raw     = master_nonzero["USD_TOPLAM"]
-print(f" - log(1+y) donusumu: skewness {y_raw.skew():.2f} -> {y_log.skew():.2f}")
+# Ortak feature listesi (Stage 1 ve Stage 2 ayni features kullanir)
+features_enr = ['YAS', 'GECELEME', 'COCUK', 'OTEL_TUR', 'UYRUK_OTEL_SKORU', 'CSI', 'ILCE_KOD',
+                 'SICAKLIK', 'NEM', 'THI_INDEX']
 
-print(" --- BASELINE (Meteorolojisiz) ---")
-features_base = ["YAS", "GECELEME", "COCUK", "OTEL_TUR", "UYRUK_OTEL_SKORU", "CSI", "ILCE_KOD"]
+X_clf = master[features_enr].copy()
+# Meteoroloji NaN'larini doldur (zaten dolduruldu ama emin ol)
+X_clf = X_clf.fillna(0)
+
+from sklearn.metrics import roc_auc_score, accuracy_score
+
+xgb_clf = xgb.XGBClassifier(
+    n_estimators=200, learning_rate=0.05, max_depth=5,
+    subsample=0.85, colsample_bytree=0.85,
+    scale_pos_weight=(len(master)-len(master_nonzero))/len(master_nonzero),  # sinif dengesizligi duzeltme
+    use_label_encoder=False, eval_metric='logloss', random_state=42
+)
+xgb_clf.fit(X_clf, master['HARCAMA_YAPTI'])
+
+p_insample = xgb_clf.predict_proba(X_clf)[:, 1]
+auc_insample = roc_auc_score(master['HARCAMA_YAPTI'], p_insample)
+acc_insample = accuracy_score(master['HARCAMA_YAPTI'], (p_insample > 0.5).astype(int))
+print(f" - Stage 1 (Classifier) in-sample AUC:  {auc_insample:.4f}")
+print(f" - Stage 1 (Classifier) in-sample ACC:  {acc_insample:.4f}")
+
+print(" --- BASELINE (Meteorolojisiz, Stage 2 icin) ---")
+features_base = ['YAS', 'GECELEME', 'COCUK', 'OTEL_TUR', 'UYRUK_OTEL_SKORU', 'CSI', 'ILCE_KOD']
 X_base = master_nonzero[features_base].copy()
+
+# log(1+y) donusumu
+master_nonzero['LOG_USD'] = np.log1p(master_nonzero['USD_TOPLAM'])
+for cat in ['SPEND_GASTRONOMI', 'SPEND_ALISVERIS', 'SPEND_KULTUR', 'SPEND_SAGLIK']:
+    master_nonzero[f'LOG_{cat}'] = np.log1p(master_nonzero[cat])
+
+y_log = master_nonzero['LOG_USD']
+y_raw = master_nonzero['USD_TOPLAM']
+print(f" - log(1+y) donusumu: skewness {y_raw.skew():.2f} -> {y_log.skew():.2f}")
 
 xgb_base = xgb.XGBRegressor(n_estimators=150, learning_rate=0.08, max_depth=5,
                               subsample=0.8, random_state=42)
@@ -276,46 +304,82 @@ xgb_base.fit(X_base, y_log)
 y_pred_base_raw = np.expm1(xgb_base.predict(X_base))
 r2_base = r2_score(y_raw, y_pred_base_raw)
 rmse_base = np.sqrt(mean_squared_error(y_raw, y_pred_base_raw))
-print(f" - Baseline XGBoost R2 : {r2_base:.4f}  |  RMSE: ${rmse_base:.2f}")
+print(f" - Baseline Stage2 XGBoost R2: {r2_base:.4f}  |  RMSE: ${rmse_base:.2f}")
 
 # ============================================================
-# ADIM 3B: ENRİCHED MODEL (meteoroloji + log transform + nonzero)
+# STAGE 2: REGRESSOR — Ne kadar harcar? (Sadece nonzero)
 # ============================================================
-print(" --- ENRİCHED MODEL (Meteoroloji + log-transform + nonzero egitim) ---")
-features_enr = ["YAS", "GECELEME", "COCUK", "OTEL_TUR", "UYRUK_OTEL_SKORU", "CSI", "ILCE_KOD",
-                 "SICAKLIK", "NEM", "THI_INDEX"]
+print(" --- STAGE 2: ENRICHED REGRESSOR (Meteoroloji + log-transform + nonzero) ---")
 X_enr = master_nonzero[features_enr].copy()
 
-xgb_enr = xgb.XGBRegressor(n_estimators=300, learning_rate=0.05, max_depth=6,
-                              subsample=0.85, colsample_bytree=0.85,
-                              min_child_weight=5, reg_lambda=1.5, random_state=42)
+xgb_enr = xgb.XGBRegressor(
+    n_estimators=300, learning_rate=0.05, max_depth=6,
+    subsample=0.85, colsample_bytree=0.85,
+    min_child_weight=5, reg_lambda=1.5, random_state=42
+)
 xgb_enr.fit(X_enr, y_log)
 y_pred_enr_raw = np.expm1(xgb_enr.predict(X_enr))
-r2_enr  = r2_score(y_raw, y_pred_enr_raw)
+r2_enr = r2_score(y_raw, y_pred_enr_raw)
 rmse_enr = np.sqrt(mean_squared_error(y_raw, y_pred_enr_raw))
-print(f" - Enriched XGBoost R2: {r2_enr:.4f}  |  RMSE: ${rmse_enr:.2f}")
+print(f" - Stage 2 in-sample R2:  {r2_enr:.4f}  |  RMSE: ${rmse_enr:.2f}")
 
-# 5-Fold Cross-Validation (gercek genelleme gucu)
-from sklearn.model_selection import KFold
-kf = KFold(n_splits=5, shuffle=True, random_state=42)
-cv_r2, cv_rmse = [], []
-for tr_idx, te_idx in kf.split(X_enr):
-    X_tr, X_te = X_enr.iloc[tr_idx], X_enr.iloc[te_idx]
-    y_tr, y_te = y_log.iloc[tr_idx], y_raw.iloc[te_idx]
-    m = xgb.XGBRegressor(n_estimators=300, learning_rate=0.05, max_depth=6,
-                         subsample=0.85, colsample_bytree=0.85,
-                         min_child_weight=5, reg_lambda=1.5, random_state=42)
-    m.fit(X_tr, y_tr)
-    y_hat = np.expm1(m.predict(X_te))
-    cv_r2.append(r2_score(y_te, y_hat))
-    cv_rmse.append(np.sqrt(mean_squared_error(y_te, y_hat)))
-cv_r2_mean  = float(np.mean(cv_r2))
-cv_rmse_mean = float(np.mean(cv_rmse))
-print(f" - 5-Fold CV R2:  {cv_r2_mean:.4f} (+/- {np.std(cv_r2):.4f})")
-print(f" - 5-Fold CV RMSE: ${cv_rmse_mean:.2f} (+/- ${np.std(cv_rmse):.2f})")
+# ============================================================
+# TWO-STAGE 5-FOLD CROSS-VALIDATION — Tum 31.848 kayit uzerinde gercek olcum
+# ============================================================
+print(" --- TWO-STAGE 5-FOLD CV (tum veri uzerinde gercek genelleme gucu) ---")
+from sklearn.model_selection import StratifiedKFold
 
-delta_r2 = r2_enr - r2_base
-print(f"\n *** Delta_R2 (Meteoroloji + log katkisi) = +{delta_r2:.4f} ({delta_r2*100:.2f} puan artis) ***")
+skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+cv_r2_full, cv_rmse_full = [], []
+cv_auc = []
+
+for fold, (tr_idx, te_idx) in enumerate(skf.split(master, master['HARCAMA_YAPTI'])):
+    X_tr_full = master.iloc[tr_idx][features_enr].fillna(0)
+    X_te_full = master.iloc[te_idx][features_enr].fillna(0)
+    y_tr_bin  = master.iloc[tr_idx]['HARCAMA_YAPTI']
+    y_te_bin  = master.iloc[te_idx]['HARCAMA_YAPTI']
+    y_te_real = master.iloc[te_idx]['USD_TOPLAM']
+
+    # Stage 1: Classifier
+    clf_cv = xgb.XGBClassifier(
+        n_estimators=200, learning_rate=0.05, max_depth=5,
+        subsample=0.85, colsample_bytree=0.85,
+        scale_pos_weight=(y_tr_bin==0).sum()/(y_tr_bin==1).sum(),
+        use_label_encoder=False, eval_metric='logloss', random_state=42
+    )
+    clf_cv.fit(X_tr_full, y_tr_bin)
+    p_spend_te = clf_cv.predict_proba(X_te_full)[:, 1]
+    cv_auc.append(roc_auc_score(y_te_bin, p_spend_te))
+
+    # Stage 2: Regressor (sadece train setindeki nonzerolar)
+    tr_nonzero_mask = master.iloc[tr_idx]['USD_TOPLAM'] > 0
+    X_tr_nz = master.iloc[tr_idx][tr_nonzero_mask][features_enr].fillna(0)
+    y_tr_nz_log = np.log1p(master.iloc[tr_idx][tr_nonzero_mask]['USD_TOPLAM'])
+
+    reg_cv = xgb.XGBRegressor(
+        n_estimators=300, learning_rate=0.05, max_depth=6,
+        subsample=0.85, colsample_bytree=0.85,
+        min_child_weight=5, reg_lambda=1.5, random_state=42
+    )
+    reg_cv.fit(X_tr_nz, y_tr_nz_log)
+
+    # Kombine tahmin: P(harcama) * E(harcama | harcama>0)
+    e_spend_te = np.expm1(reg_cv.predict(X_te_full))
+    y_hat_combined = p_spend_te * e_spend_te
+
+    cv_r2_full.append(r2_score(y_te_real, y_hat_combined))
+    cv_rmse_full.append(np.sqrt(mean_squared_error(y_te_real, y_hat_combined)))
+    print(f"   Fold {fold+1}: R2={cv_r2_full[-1]:.4f}  RMSE=${cv_rmse_full[-1]:.0f}  AUC={cv_auc[-1]:.3f}")
+
+cv_r2_mean   = float(np.mean(cv_r2_full))
+cv_rmse_mean = float(np.mean(cv_rmse_full))
+cv_auc_mean  = float(np.mean(cv_auc))
+print(f" - Two-Stage CV R2:   {cv_r2_mean:.4f} (+/- {np.std(cv_r2_full):.4f})")
+print(f" - Two-Stage CV RMSE: ${cv_rmse_mean:.2f}")
+print(f" - Classifier CV AUC: {cv_auc_mean:.4f}")
+
+delta_r2 = cv_r2_mean - r2_base
+print(f"\n *** Two-Stage delta vs Baseline = {delta_r2:+.4f} ***")
 
 print("\n --- CATEGORY PREDICTORS (Gastronomy, Shopping, Culture, Health) ---")
 xgb_gas = xgb.XGBRegressor(n_estimators=150, learning_rate=0.07, max_depth=5, random_state=42)
@@ -383,39 +447,43 @@ print(f" - Cox-PH C-Index: {c_index:.3f}")
 # ============================================================
 # MODELLERI KAYDET
 # ============================================================
-print("\n7. YENİ MODELLERİN KAYDEDİLMESİ")
-os.makedirs("models", exist_ok=True)
+print("\n7. YENi MODELLERiN KAYDEDiLMESi")
+os.makedirs('models', exist_ok=True)
 jmodels_dict = {
-    "xgb_budget": xgb_enr,
-    "xgb_gas": xgb_gas,
-    "xgb_ali": xgb_ali,
-    "xgb_kul": xgb_kul,
-    "xgb_sag": xgb_sag,
-    "cox_ph": cph,
-    "kmeans": km,
-    "le_ilce": le_ilce,
-    "ulke_otel_skor_dict": ulke_otel_skor_dict,
-    "global_median_score": global_median_score,
-    "features": features_enr,
-    "log_transform": True,
-    "metadata": {
-        "version": "7.0_zeroinflation_logtransform",
-        "description": "Zero-inflation + log(1+y) + nonzero egitim + Target Encoding",
-        "r2_cv": round(cv_r2_mean, 4),
-        "rmse_cv": round(cv_rmse_mean, 2),
-        "timestamp": "2026-06-18"
+    'xgb_budget':           xgb_enr,
+    'xgb_clf':              xgb_clf,   # Stage 1 siniflandirici
+    'xgb_gas':              xgb_gas,
+    'xgb_ali':              xgb_ali,
+    'xgb_kul':              xgb_kul,
+    'xgb_sag':              xgb_sag,
+    'cox_ph':               cph,
+    'kmeans':               km,
+    'le_ilce':              le_ilce,
+    'ulke_otel_skor_dict':  ulke_otel_skor_dict,
+    'global_median_score':  global_median_score,
+    'features':             features_enr,
+    'log_transform':        True,
+    'two_stage':            True,
+    'metadata': {
+        'version':     '8.0_two_stage_hurdle',
+        'description': 'Two-Stage Hurdle Model: XGBClassifier(full) + XGBRegressor(nonzero, log-transform)',
+        'r2_cv':       round(cv_r2_mean, 4),
+        'rmse_cv':     round(cv_rmse_mean, 2),
+        'auc_cv':      round(cv_auc_mean, 4),
+        'timestamp':   '2026-06-18'
     }
 }
-joblib.dump(jmodels_dict, "models/advanced_models.pkl")
+joblib.dump(jmodels_dict, 'models/advanced_models.pkl')
 
 print("\n" + "="*60)
-print("V7 RAPORU — ZERO-INFLATION + LOG-TRANSFORM DUZELTMESI")
+print("V8 RAPORU - TWO-STAGE HURDLE MODEL")
 print("="*60)
-print(f" Eski Baseline R2 (tum veri):    {r2_base:.4f}")
-print(f" Yeni In-sample R2 (nonzero):     {r2_enr:.4f}")
-print(f" 5-Fold CV R2 (gercek guc):       {cv_r2_mean:.4f}")
-print(f" 5-Fold CV RMSE:                   ${cv_rmse_mean:.2f}")
-print(f" Cox-PH C-Index:                   {c_index:.3f}")
-print(f" Egitim kayit sayisi (nonzero):    {len(master_nonzero)}")
-print(f" log(1+y) skewness duzeltmesi:     {y_raw.skew():.2f} -> {y_log.skew():.2f}")
+print(f" Stage 1 Classifier AUC (CV):     {cv_auc_mean:.4f}")
+print(f" Stage 2 Regressor R2 (in-sample):{r2_enr:.4f}")
+print(f" Two-Stage CV R2 (tum veri):      {cv_r2_mean:.4f}")
+print(f" Two-Stage CV RMSE:               ${cv_rmse_mean:.2f}")
+print(f" Cox-PH C-Index:                  {c_index:.3f}")
+print(f" Egitim verileri - Toplam:        {len(master)}")
+print(f"                  Nonzero:        {len(master_nonzero)} ({100*len(master_nonzero)/len(master):.1f}%)")
+print(f" log(1+y) skewness duzeltmesi:    {y_raw.skew():.2f} -> {y_log.skew():.2f}")
 print("="*60)
