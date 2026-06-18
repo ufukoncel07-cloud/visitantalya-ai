@@ -304,6 +304,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         echartsMap.setOption(option);
+        
+        // Force resize to fix "blank map" issue if container was hidden
+        echartsMap.resize();
+        setTimeout(() => {
+            if (echartsMap) echartsMap.resize();
+        }, 150);
     }
 
     // ============================================================
