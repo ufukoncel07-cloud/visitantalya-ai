@@ -214,56 +214,79 @@ document.addEventListener('DOMContentLoaded', () => {
     // LEAFLET HEAT MAP (İlçe Harcama Isı Haritası)
     // ============================================================
     let leafletMap = null;
-    let leafletMarkers = [];
+    let geojsonData = null;
+    let geojsonLayer = null;
 
-    const DISTRICT_DATA = {
-        'Alanya':    { lat: 36.54, lon: 32.00, spend: 262, color: '#ef4444' },
-        'Manavgat':  { lat: 36.78, lon: 31.44, spend: 221, color: '#f59e0b' },
-        'Kemer':     { lat: 36.60, lon: 30.56, spend: 291, color: '#ef4444' },
-        'Serik':     { lat: 36.92, lon: 31.08, spend: 181, color: '#f59e0b' },
-        'Muratpaşa': { lat: 36.89, lon: 30.69, spend: 159, color: '#22d3ee' },
-        'Aksu':      { lat: 36.95, lon: 30.89, spend: 171, color: '#f59e0b' },
-    };
-
-    function updateLeafletMap(data) {
+    async function updateLeafletMap(data) {
         const mapEl = document.getElementById('antalya-map');
         if (!mapEl) return;
 
         const selectedDistrict = document.getElementById('ilce').value;
+        const predictedSpend = data.usd_p || 0;
 
         if (!leafletMap) {
             leafletMap = L.map('antalya-map', { zoomControl: true, attributionControl: false })
-                          .setView([36.75, 31.0], 9);
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                          .setView([36.9, 31.2], 9);
+            // Minimalist Koyu Zemin (Sokak izleri yok)
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
                 subdomains: 'abcd', maxZoom: 14
             }).addTo(leafletMap);
-        } else {
-            leafletMarkers.forEach(m => m.remove());
-            leafletMarkers = [];
         }
 
-        Object.entries(DISTRICT_DATA).forEach(([name, d]) => {
-            const isSelected = name === selectedDistrict;
-            const radius = isSelected ? 24 : 14;
-            const opacity = isSelected ? 1.0 : 0.6;
-            const color = isSelected ? '#10b981' : d.color;
-
-            const circle = L.circleMarker([d.lat, d.lon], {
-                radius, color, fillColor: color, fillOpacity: opacity, weight: isSelected ? 3 : 1
-            }).addTo(leafletMap);
-
-            circle.bindTooltip(`
-                <b>${name}</b><br>
-                Medyan Harcama: $${d.spend}<br>
-                ${isSelected ? '\u2b50 Seçili İlçe' : ''}
-            `, { permanent: false, direction: 'top' });
-
-            if (isSelected) {
-                circle.openTooltip();
-                leafletMap.setView([d.lat, d.lon], 10, { animate: true });
+        // Ilce poligonlarini getir (Sadece ilk seferinde)
+        if (!geojsonData) {
+            try {
+                const response = await fetch('/static/antalya_districts.json');
+                geojsonData = await response.json();
+            } catch (e) {
+                console.error("GeoJSON yüklenemedi:", e);
+                return;
             }
-            leafletMarkers.push(circle);
-        });
+        }
+
+        if (geojsonLayer) {
+            leafletMap.removeLayer(geojsonLayer);
+        }
+
+        // Choropleth (Doldurulmus Poligon) Cizimi
+        geojsonLayer = L.geoJSON(geojsonData, {
+            style: function(feature) {
+                const isSelected = feature.properties.name === selectedDistrict;
+                return {
+                    fillColor: isSelected ? '#10b981' : '#1e293b',
+                    weight: isSelected ? 2 : 1,
+                    opacity: 1,
+                    color: isSelected ? '#34d399' : '#334155',
+                    fillOpacity: isSelected ? 0.7 : 0.4
+                };
+            },
+            onEachFeature: function(feature, layer) {
+                const isSelected = feature.properties.name === selectedDistrict;
+                let popupContent = `<div style="text-align:center; font-family:Inter,sans-serif;"><b>${feature.properties.name}</b>`;
+                if (isSelected) {
+                    popupContent += `<br/><span style="color:#10b981; font-weight:bold; font-size:14px;">Tahmin: $${Math.round(predictedSpend)}</span>`;
+                }
+                popupContent += `</div>`;
+                
+                layer.bindTooltip(popupContent, {
+                    permanent: isSelected, 
+                    direction: "center",
+                    className: "bg-gray-800 border-gray-700 text-white" // Tailwind siniflari eklenebilir ama default tooltip de yeterli
+                });
+                
+                if (isSelected) {
+                    layer.bringToFront();
+                }
+            }
+        }).addTo(leafletMap);
+
+        // Haritayi secilen ilceye gore ortala
+        const selectedLayer = Object.values(geojsonLayer._layers).find(l => l.feature.properties.name === selectedDistrict);
+        if (selectedLayer) {
+            leafletMap.fitBounds(selectedLayer.getBounds(), { padding: [50, 50], animate: true, maxZoom: 10 });
+        } else {
+            leafletMap.fitBounds(geojsonLayer.getBounds(), { padding: [20, 20] });
+        }
 
         setTimeout(() => leafletMap.invalidateSize(), 200);
     }
