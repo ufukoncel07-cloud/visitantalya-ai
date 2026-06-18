@@ -148,8 +148,10 @@ def predict():
             ilce_kod = float(le_ilce.transform([mapped_ilce])[0]) if le_ilce else 0.0
         except:
             ilce_kod = 0.0
-        otel_v    = float(min(10, max(1, otel_yildiz * 1.8)))
-        
+        try:
+            otel_v = float(data.get("otel_yildiz", 7.0))
+        except:
+            otel_v = 7.0
         if csi_giris and str(csi_giris).strip() != "":
             csi_v = float(csi_giris)
         else:

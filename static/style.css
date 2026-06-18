@@ -526,16 +526,16 @@ select option {
     }
     
     .simulator-layout {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
         gap: 16px;
     }
     
     .form-row {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
     
     .xai-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
     
     header h1 {
