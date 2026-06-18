@@ -143,8 +143,8 @@ document.addEventListener('DOMContentLoaded', () => {
         // --- Turist DNA Radar Grafiği ---
         renderDNARadar(data);
 
-        // --- Leaflet Harita: Seçilen ilçeyi vurgula ---
-        updateLeafletMap(data);
+        // --- ECharts Harita: Seçilen ilçeyi vurgula ---
+        updateEChartsMap(data);
     }
 
     // ============================================================
@@ -211,26 +211,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ============================================================
-    // LEAFLET HEAT MAP (İlçe Harcama Isı Haritası)
+    // ECHARTS GEOJSON MAP (İlçe Harcama Isı Haritası)
     // ============================================================
-    let leafletMap = null;
+    let echartsMap = null;
     let geojsonData = null;
-    let geojsonLayer = null;
 
-    async function updateLeafletMap(data) {
+    async function updateEChartsMap(data) {
         const mapEl = document.getElementById('antalya-map');
         if (!mapEl) return;
 
         const selectedDistrict = document.getElementById('ilce').value;
         const predictedSpend = data.usd_p || 0;
 
-        if (!leafletMap) {
-            leafletMap = L.map('antalya-map', { zoomControl: true, attributionControl: false })
-                          .setView([36.9, 31.2], 9);
-            // Minimalist Koyu Zemin (Sokak izleri yok)
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
-                subdomains: 'abcd', maxZoom: 14
-            }).addTo(leafletMap);
+        if (!echartsMap) {
+            echartsMap = echarts.init(mapEl);
+            // Handle window resize
+            window.addEventListener('resize', function() {
+                echartsMap.resize();
+            });
         }
 
         // Ilce poligonlarini getir (Sadece ilk seferinde)
@@ -238,57 +236,74 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const response = await fetch('/static/antalya_districts.json');
                 geojsonData = await response.json();
+                echarts.registerMap('antalya', geojsonData);
             } catch (e) {
                 console.error("GeoJSON yüklenemedi:", e);
                 return;
             }
         }
 
-        if (geojsonLayer) {
-            leafletMap.removeLayer(geojsonLayer);
-        }
-
-        // Choropleth (Doldurulmus Poligon) Cizimi
-        geojsonLayer = L.geoJSON(geojsonData, {
-            style: function(feature) {
-                const isSelected = feature.properties.name === selectedDistrict;
-                return {
-                    fillColor: isSelected ? '#10b981' : '#1e293b',
-                    weight: isSelected ? 2 : 1,
-                    opacity: 1,
-                    color: isSelected ? '#34d399' : '#334155',
-                    fillOpacity: isSelected ? 0.7 : 0.4
-                };
+        const option = {
+            backgroundColor: 'transparent',
+            tooltip: {
+                trigger: 'item',
+                formatter: function(params) {
+                    const isSelected = params.name === selectedDistrict;
+                    let tooltip = `<div style="font-family:Inter,sans-serif; text-align:center;"><b>${params.name}</b>`;
+                    if (isSelected) {
+                        tooltip += `<br/><span style="color:#10b981; font-weight:bold; font-size:14px;">Tahmin: $${Math.round(predictedSpend)}</span>`;
+                    }
+                    tooltip += `</div>`;
+                    return tooltip;
+                },
+                backgroundColor: 'rgba(30, 41, 59, 0.9)',
+                borderColor: '#334155',
+                textStyle: { color: '#fff' }
             },
-            onEachFeature: function(feature, layer) {
-                const isSelected = feature.properties.name === selectedDistrict;
-                let popupContent = `<div style="text-align:center; font-family:Inter,sans-serif;"><b>${feature.properties.name}</b>`;
-                if (isSelected) {
-                    popupContent += `<br/><span style="color:#10b981; font-weight:bold; font-size:14px;">Tahmin: $${Math.round(predictedSpend)}</span>`;
+            series: [
+                {
+                    type: 'map',
+                    map: 'antalya',
+                    roam: true, // zoom and pan enabled
+                    zoom: 1.2,
+                    itemStyle: {
+                        areaColor: '#1e293b',
+                        borderColor: '#334155',
+                        borderWidth: 1
+                    },
+                    emphasis: {
+                        itemStyle: {
+                            areaColor: '#3b82f6',
+                            borderColor: '#60a5fa'
+                        },
+                        label: {
+                            show: true,
+                            color: '#fff',
+                            fontWeight: 'bold'
+                        }
+                    },
+                    select: {
+                        itemStyle: {
+                            areaColor: '#10b981',
+                            borderColor: '#34d399',
+                            borderWidth: 2
+                        },
+                        label: {
+                            show: true,
+                            color: '#fff',
+                            fontWeight: 'bold'
+                        }
+                    },
+                    data: geojsonData.features.map(f => ({
+                        name: f.properties.name,
+                        value: f.properties.name === selectedDistrict ? predictedSpend : 0,
+                        selected: f.properties.name === selectedDistrict
+                    }))
                 }
-                popupContent += `</div>`;
-                
-                layer.bindTooltip(popupContent, {
-                    permanent: isSelected, 
-                    direction: "center",
-                    className: "bg-gray-800 border-gray-700 text-white" // Tailwind siniflari eklenebilir ama default tooltip de yeterli
-                });
-                
-                if (isSelected) {
-                    layer.bringToFront();
-                }
-            }
-        }).addTo(leafletMap);
+            ]
+        };
 
-        // Haritayi secilen ilceye gore ortala
-        const selectedLayer = Object.values(geojsonLayer._layers).find(l => l.feature.properties.name === selectedDistrict);
-        if (selectedLayer) {
-            leafletMap.fitBounds(selectedLayer.getBounds(), { padding: [50, 50], animate: true, maxZoom: 10 });
-        } else {
-            leafletMap.fitBounds(geojsonLayer.getBounds(), { padding: [20, 20] });
-        }
-
-        setTimeout(() => leafletMap.invalidateSize(), 200);
+        echartsMap.setOption(option);
     }
 
     // ============================================================
