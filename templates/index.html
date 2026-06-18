@@ -9,7 +9,9 @@
     <link rel="apple-touch-icon" href="{{ url_for('serve_icon') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
     <div class="bg-shape shape1"></div>
@@ -148,9 +150,14 @@
                             </div>
 
                             <div class="result-grid">
-                                <div class="res-item">
-                                    <span class="label">Tahmini Harcama (GBM)</span>
-                                    <span class="value" id="res-usd">$0</span>
+                                <div class="res-item" style="grid-column: 1 / -1;">
+                                    <span class="label">Tahmini Harcama (GBM) — Güven Aralığı</span>
+                                    <span class="value" id="res-usd" style="color:#10b981; font-size:24px;">$0</span>
+                                    <div id="confidence-band" style="margin-top:8px; padding:8px 12px; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:8px; display:none;">
+                                        <span style="font-size:12px; color:#94a3b8;">%70 Güven Aralığı: </span>
+                                        <span style="font-size:13px; color:#10b981; font-weight:600;" id="confidence-range">$— – $—</span>
+                                        <span style="font-size:11px; color:#64748b; margin-left:8px;">± $1,324 model RMSE</span>
+                                    </div>
                                 </div>
                                 <div class="res-item">
                                     <span class="label">Bütçe Segmenti</span>
@@ -211,30 +218,39 @@
                                     </ul>
                                 </div>
 
-                                <div class="xai-grid" style="display: grid; gap: 24px; grid-template-columns: 1fr; max-width: 100%;">
-                                    <div class="chart-container" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); max-width: 100%; box-sizing: border-box;">
-                                        <p style="font-size: 14px; color: #cbd5e1; margin-bottom: 12px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">Alternatif Paket Analizi</p>
-                                        <div id="paket-listesi" style="display: flex; flex-direction: column; gap: 8px;">
-                                            <!-- JS ile dolacak -->
+                                <div class="xai-grid" style="display:grid; gap:24px; grid-template-columns:1fr; max-width:100%;">
+                                    <!-- Turist DNA Radar Grafiği -->
+                                    <div style="background:rgba(139,92,246,0.07); padding:16px; border-radius:12px; border:1px solid rgba(139,92,246,0.25);">
+                                        <p style="font-size:14px; color:#a78bfa; margin-bottom:12px; font-weight:600;">🧬 Turist DNA'sı — Radar Analizi</p>
+                                        <div style="position:relative; width:100%; height:260px;">
+                                            <canvas id="dnaRadarChart"></canvas>
                                         </div>
                                     </div>
-                                    
-                                    <div class="chart-container" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); max-width: 100%; box-sizing: border-box;">
-                                        <p style="font-size: 14px; color: #cbd5e1; margin-bottom: 12px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">Gün Bazlı Satın Alma İhtimali</p>
-                                        <div id="gun-listesi" style="display: flex; flex-direction: row; overflow-x: auto; gap: 8px; padding-bottom: 8px; max-width: 100%;">
-                                            <!-- JS ile dolacak -->
-                                        </div>
+
+                                    <!-- İlçe Harcama Isı Haritası -->
+                                    <div style="background:rgba(59,130,246,0.07); padding:16px; border-radius:12px; border:1px solid rgba(59,130,246,0.25);">
+                                        <p style="font-size:14px; color:#60a5fa; margin-bottom:12px; font-weight:600;">🗺️ İlçe Harcama Isı Haritası</p>
+                                        <div id="antalya-map" style="height:260px; border-radius:8px; overflow:hidden;"></div>
+                                    </div>
+
+                                    <div class="chart-container" style="background:rgba(0,0,0,0.2); padding:16px; border-radius:12px; border:1px solid rgba(255,255,255,0.05); max-width:100%; box-sizing:border-box;">
+                                        <p style="font-size:14px; color:#cbd5e1; margin-bottom:12px; font-weight:500; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px;">Alternatif Paket Analizi</p>
+                                        <div id="paket-listesi" style="display:flex; flex-direction:column; gap:8px;"></div>
+                                    </div>
+                                    <div class="chart-container" style="background:rgba(0,0,0,0.2); padding:16px; border-radius:12px; border:1px solid rgba(255,255,255,0.05); max-width:100%; box-sizing:border-box;">
+                                        <p style="font-size:14px; color:#cbd5e1; margin-bottom:12px; font-weight:500; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:8px;">Gün Bazlı Satın Alma İhtimali</p>
+                                        <div id="gun-listesi" style="display:flex; flex-direction:row; overflow-x:auto; gap:8px; padding-bottom:8px; max-width:100%;"></div>
                                     </div>
                                     <div>
-                                      <div style="background:rgba(255,255,255,0.02); padding:16px; border-radius:12px; border:1px solid rgba(255,255,255,0.05); margin-bottom: 12px;">
-                                          <p style="font-size: 12px; color: #94a3b8; margin-bottom: 8px; text-align: center;">Memnuniyet Çöküş Eğrisi</p>
-                                          <div style="position: relative; width: 100%; min-height: 200px;">
+                                      <div style="background:rgba(255,255,255,0.02); padding:16px; border-radius:12px; border:1px solid rgba(255,255,255,0.05); margin-bottom:12px;">
+                                          <p style="font-size:12px; color:#94a3b8; margin-bottom:8px; text-align:center;">Memnuniyet Çöküş Eğrisi</p>
+                                          <div style="position:relative; width:100%; min-height:200px;">
                                               <canvas id="decayChart"></canvas>
                                           </div>
                                       </div>
                                       <div style="background:rgba(255,255,255,0.02); padding:16px; border-radius:12px; border:1px solid rgba(255,255,255,0.05);">
-                                          <p style="font-size: 12px; color: #94a3b8; margin-bottom: 8px; text-align: center;">Bütçe Karşılaştırması</p>
-                                          <div style="position: relative; width: 100%; min-height: 200px;">
+                                          <p style="font-size:12px; color:#94a3b8; margin-bottom:8px; text-align:center;">Bütçe Karşılaştırması</p>
+                                          <div style="position:relative; width:100%; min-height:200px;">
                                               <canvas id="budgetChart"></canvas>
                                           </div>
                                       </div>
@@ -262,8 +278,18 @@
                 <div class="stats-grid">
                     <div class="stat-card glass-panel">
                         <h3>Toplam Öğrenme Verisi</h3>
-                        <div class="stat-value">{{ stats.veri_kaydi }}</div>
+                        <div class="stat-value" id="kpi-veri" data-target="{{ stats.veri_kaydi }}">0</div>
                         <p class="stat-desc">Turist Profili Analiz Edildi</p>
+                    </div>
+                    <div class="stat-card glass-panel">
+                        <h3>Model CV R² Doğruluğu</h3>
+                        <div class="stat-value" id="kpi-r2" data-target="9">0</div>
+                        <p class="stat-desc">% gerçek genelleme gücü (5-Fold CV)</p>
+                    </div>
+                    <div class="stat-card glass-panel">
+                        <h3>Cox-PH C-İndeksi</h3>
+                        <div class="stat-value" id="kpi-cindex" data-target="696">0</div>
+                        <p class="stat-desc">Zamanlama modeli isabeti (1000 üzerinden)</p>
                     </div>
                     <div class="stat-card glass-panel">
                         <h3>En Çok Turist Gönderenler</h3>

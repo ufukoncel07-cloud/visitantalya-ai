@@ -88,9 +88,20 @@ document.addEventListener('DOMContentLoaded', () => {
     function populateResult(data) {
         document.getElementById('res-tour').textContent = data.onerilecek_tur.replace('_', ' ');
         document.getElementById('res-prob').textContent = `%${data.kabul_ihtimali}`;
-        document.getElementById('res-usd').textContent = `$${data.tahmini_butce_usd}`;
+
+        const usd = data.tahmini_butce_usd;
+        document.getElementById('res-usd').textContent = `$${usd}`;
+
+        // --- Güven Aralığı (Confidence Band) ---
+        const MODEL_RMSE = 1324;
+        const lo = Math.max(0, Math.round(usd - MODEL_RMSE * 0.5));
+        const hi = Math.round(usd + MODEL_RMSE * 0.5);
+        const confEl = document.getElementById('confidence-band');
+        document.getElementById('confidence-range').textContent = `$${lo.toLocaleString()} \u2013 $${hi.toLocaleString()}`;
+        confEl.style.display = 'block';
+
         document.getElementById('res-bant').textContent = data.butce_bandi;
-        document.getElementById('res-gun').textContent = `Gün ${data.optimal_push_gunu}`;
+        document.getElementById('res-gun').textContent = `G\u00fcn ${data.optimal_push_gunu}`;
         document.getElementById('res-saat').textContent = data.push_saati;
         document.getElementById('res-yas').textContent = data.yas_grubu;
         document.getElementById('res-csi').textContent = `${data.memnuniyet_csi} / 10`;
@@ -103,7 +114,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if(data.xai_proof) {
             renderDecayChart(data.xai_proof.decay_curve);
             renderBudgetChart(data.xai_proof.ulke_yas_median, data.tahmini_butce_usd, data.ulke);
-            
+
             // Paket Olasılıkları
             const pktList = document.getElementById('paket-listesi');
             if (pktList && data.xai_proof.paket_olasiliklari) {
@@ -115,20 +126,181 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>`;
                 });
             }
-            
+
             // Gün Olasılıkları
             const gunList = document.getElementById('gun-listesi');
             if (gunList && data.xai_proof.gun_olasiliklari) {
                 gunList.innerHTML = '';
                 data.xai_proof.gun_olasiliklari.forEach(g => {
                     gunList.innerHTML += `<div style="min-width:70px; text-align:center; background:rgba(255,255,255,0.05); padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1);">
-                        <div style="font-size:11px; color:#94a3b8; margin-bottom:4px;">${g.gun}. Gün</div>
+                        <div style="font-size:11px; color:#94a3b8; margin-bottom:4px;">${g.gun}. G\u00fcn</div>
                         <div style="font-size:14px; font-weight:bold; color:${g.olasilik > 40 ? '#3b82f6' : '#ef4444'};">%${g.olasilik}</div>
                     </div>`;
                 });
             }
         }
+
+        // --- Turist DNA Radar Grafiği ---
+        renderDNARadar(data);
+
+        // --- Leaflet Harita: Seçilen ilçeyi vurgula ---
+        updateLeafletMap(data);
     }
+
+    // ============================================================
+    // DNA RADAR CHART (Turist Profil Parmakizi)
+    // ============================================================
+    let dnaRadarInstance = null;
+    function renderDNARadar(data) {
+        const ctx = document.getElementById('dnaRadarChart');
+        if (!ctx) return;
+        if (dnaRadarInstance) dnaRadarInstance.destroy();
+
+        const yas = parseInt(document.getElementById('yas').value) || 35;
+        const cocuk = parseInt(document.getElementById('cocuk').value) || 0;
+        const gece = parseInt(document.getElementById('gece').value) || 7;
+        const otel = parseFloat(document.getElementById('otel').value) || 7;
+        const csi = data.memnuniyet_csi || 7.5;
+        const butce = Math.min(100, Math.round((data.tahmini_butce_usd / 1500) * 100));
+
+        // Normalize 0-100
+        const yasN    = Math.round(Math.min(100, ((yas - 18) / 62) * 100));
+        const gundN   = Math.round(Math.min(100, (gece / 30) * 100));
+        const cocukN  = Math.round((cocuk / 5) * 100);
+        const otelN   = Math.round((otel / 10) * 100);
+        const csiN    = Math.round((csi / 10) * 100);
+
+        dnaRadarInstance = new Chart(ctx, {
+            type: 'radar',
+            data: {
+                labels: ['Yaş', 'Bütçe Gücü', 'Konfor', 'Aile', 'Kalış Süresi'],
+                datasets: [{
+                    label: 'Bu Turist',
+                    data: [yasN, butce, csiN, cocukN, gundN],
+                    backgroundColor: 'rgba(139, 92, 246, 0.25)',
+                    borderColor: '#8b5cf6',
+                    pointBackgroundColor: '#a78bfa',
+                    pointRadius: 4,
+                    borderWidth: 2,
+                }, {
+                    label: 'Ortalama Turist',
+                    data: [45, 30, 75, 15, 35],
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    borderColor: 'rgba(255,255,255,0.2)',
+                    pointBackgroundColor: 'rgba(255,255,255,0.3)',
+                    pointRadius: 3,
+                    borderDash: [4, 4],
+                    borderWidth: 1,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } },
+                scales: {
+                    r: {
+                        min: 0, max: 100,
+                        ticks: { display: false },
+                        grid: { color: 'rgba(255,255,255,0.08)' },
+                        angleLines: { color: 'rgba(255,255,255,0.08)' },
+                        pointLabels: { color: '#cbd5e1', font: { size: 11 } }
+                    }
+                }
+            }
+        });
+    }
+
+    // ============================================================
+    // LEAFLET HEAT MAP (İlçe Harcama Isı Haritası)
+    // ============================================================
+    let leafletMap = null;
+    let leafletMarkers = [];
+
+    const DISTRICT_DATA = {
+        'Alanya':    { lat: 36.54, lon: 32.00, spend: 262, color: '#ef4444' },
+        'Manavgat':  { lat: 36.78, lon: 31.44, spend: 221, color: '#f59e0b' },
+        'Kemer':     { lat: 36.60, lon: 30.56, spend: 291, color: '#ef4444' },
+        'Serik':     { lat: 36.92, lon: 31.08, spend: 181, color: '#f59e0b' },
+        'Muratpaşa': { lat: 36.89, lon: 30.69, spend: 159, color: '#22d3ee' },
+        'Aksu':      { lat: 36.95, lon: 30.89, spend: 171, color: '#f59e0b' },
+    };
+
+    function updateLeafletMap(data) {
+        const mapEl = document.getElementById('antalya-map');
+        if (!mapEl) return;
+
+        const selectedDistrict = document.getElementById('ilce').value;
+
+        if (!leafletMap) {
+            leafletMap = L.map('antalya-map', { zoomControl: true, attributionControl: false })
+                          .setView([36.75, 31.0], 9);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                subdomains: 'abcd', maxZoom: 14
+            }).addTo(leafletMap);
+        } else {
+            leafletMarkers.forEach(m => m.remove());
+            leafletMarkers = [];
+        }
+
+        Object.entries(DISTRICT_DATA).forEach(([name, d]) => {
+            const isSelected = name === selectedDistrict;
+            const radius = isSelected ? 24 : 14;
+            const opacity = isSelected ? 1.0 : 0.6;
+            const color = isSelected ? '#10b981' : d.color;
+
+            const circle = L.circleMarker([d.lat, d.lon], {
+                radius, color, fillColor: color, fillOpacity: opacity, weight: isSelected ? 3 : 1
+            }).addTo(leafletMap);
+
+            circle.bindTooltip(`
+                <b>${name}</b><br>
+                Medyan Harcama: $${d.spend}<br>
+                ${isSelected ? '\u2b50 Seçili İlçe' : ''}
+            `, { permanent: false, direction: 'top' });
+
+            if (isSelected) {
+                circle.openTooltip();
+                leafletMap.setView([d.lat, d.lon], 10, { animate: true });
+            }
+            leafletMarkers.push(circle);
+        });
+
+        setTimeout(() => leafletMap.invalidateSize(), 200);
+    }
+
+    // ============================================================
+    // ANIMATED KPI COUNTERS (Dashboard)
+    // ============================================================
+    function animateCounter(el, target, duration = 1500, suffix = '') {
+        let start = 0;
+        const step = target / (duration / 16);
+        const timer = setInterval(() => {
+            start += step;
+            if (start >= target) {
+                start = target;
+                clearInterval(timer);
+            }
+            el.textContent = Math.round(start).toLocaleString() + suffix;
+        }, 16);
+    }
+
+    function animateKPIs() {
+        const kpiVeri = document.getElementById('kpi-veri');
+        const kpiR2   = document.getElementById('kpi-r2');
+        const kpiCi   = document.getElementById('kpi-cindex');
+        if (kpiVeri) animateCounter(kpiVeri, parseInt(kpiVeri.dataset.target), 2000);
+        if (kpiR2)   animateCounter(kpiR2,   parseInt(kpiR2.dataset.target),  1200, '%');
+        if (kpiCi)   animateCounter(kpiCi,   parseInt(kpiCi.dataset.target),  1600);
+    }
+
+    // Trigger KPI animation when user switches to dashboard tab
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            if (item.getAttribute('data-target') === 'dashboard') {
+                setTimeout(animateKPIs, 300);
+            }
+        });
+    });
 
     function renderDecayChart(decayCurve) {
         const ctx = document.getElementById('decayChart').getContext('2d');
