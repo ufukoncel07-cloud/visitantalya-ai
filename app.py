@@ -243,7 +243,7 @@ def predict():
             meteo_source = "Aylik Ortalama (Fallback)"
 
         fv_df = pd.DataFrame(
-            [[float(yas), float(geceleme), float(cocuk_sayi), otel_v, csi_v, ilce_kod, sicaklik, nem, thi]],
+            [[float(yas), float(geceleme), float(cocuk_sayi), otel_v, uyruk_otel_skoru, csi_v, ilce_kod, sicaklik, nem, thi]],
             columns=features
         )
         usd_p = float(xgb_budget.predict(fv_df)[0])
