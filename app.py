@@ -108,11 +108,11 @@ def predict():
     try:
         data = request.json
         ilce = data.get("ilce", "Antalya")
-        otel_yildiz = int(data.get("otel", 5))
-        ulke_kodu = int(data.get("ulke", 4))
-        yas = int(data.get("yas", 35))
-        cocuk_sayi = int(data.get("cocuk", 0))
-        geceleme = int(data.get("gece", 7))
+        otel_yildiz = int(float(data.get("otel", 5)))
+        ulke_kodu = int(float(data.get("ulke", 4)))
+        yas = int(float(data.get("yas", 35)))
+        cocuk_sayi = int(float(data.get("cocuk", 0)))
+        geceleme = int(float(data.get("gece", 7)))
         csi_giris = data.get("csi")
         checkin_str = data.get("checkin", None)
 
