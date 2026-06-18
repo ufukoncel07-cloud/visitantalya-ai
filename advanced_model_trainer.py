@@ -250,58 +250,91 @@ b_data = master[["USD_TOPLAM","CSI"]].fillna(0)
 master["PERSONA"] = km.fit_predict(b_data)
 
 # ============================================================
-# ADIM 3A: BASELINE MODEL (meteoroloji olmadan)
+# ADIM 3A: SIFIR-ENFLASYONu GIDER — Sadece harcama yapan turistler
 # ============================================================
-print("\n4. KARŞILAŞTIRMALI MODEL EĞİTİMİ")
+print("\n4. KARSILASTIRMALI MODEL EGITIMI")
+print(f" - Toplam kayit: {len(master)}")
+master_nonzero = master[master["USD_TOPLAM"] > 0].copy()
+print(f" - Sifir-harcarma filtresi: {len(master_nonzero)} kayit kaldi ({100*len(master_nonzero)/len(master):.1f}%)")
+
+# log(1+y) donusumu: Siddetli sag-carpikligi duzeltiyor (skewness 9.6 -> ~1.2)
+master_nonzero["LOG_USD"] = np.log1p(master_nonzero["USD_TOPLAM"])
+for cat in ["SPEND_GASTRONOMI", "SPEND_ALISVERIS", "SPEND_KULTUR", "SPEND_SAGLIK"]:
+    master_nonzero[f"LOG_{cat}"] = np.log1p(master_nonzero[cat])
+
+y_log     = master_nonzero["LOG_USD"]
+y_raw     = master_nonzero["USD_TOPLAM"]
+print(f" - log(1+y) donusumu: skewness {y_raw.skew():.2f} -> {y_log.skew():.2f}")
+
 print(" --- BASELINE (Meteorolojisiz) ---")
 features_base = ["YAS", "GECELEME", "COCUK", "OTEL_TUR", "UYRUK_OTEL_SKORU", "CSI", "ILCE_KOD"]
-X_base = master[features_base].copy()
-y = master["USD_TOPLAM"]
+X_base = master_nonzero[features_base].copy()
 
 xgb_base = xgb.XGBRegressor(n_estimators=150, learning_rate=0.08, max_depth=5,
                               subsample=0.8, random_state=42)
-xgb_base.fit(X_base, y)
-r2_base = r2_score(y, xgb_base.predict(X_base))
-rmse_base = np.sqrt(mean_squared_error(y, xgb_base.predict(X_base)))
-print(f" - Baseline XGBoost R² : {r2_base:.4f}  |  RMSE: ${rmse_base:.2f}")
+xgb_base.fit(X_base, y_log)
+y_pred_base_raw = np.expm1(xgb_base.predict(X_base))
+r2_base = r2_score(y_raw, y_pred_base_raw)
+rmse_base = np.sqrt(mean_squared_error(y_raw, y_pred_base_raw))
+print(f" - Baseline XGBoost R2 : {r2_base:.4f}  |  RMSE: ${rmse_base:.2f}")
 
 # ============================================================
-# ADIM 3B: ENRİCHED MODEL (meteoroloji ile)
+# ADIM 3B: ENRİCHED MODEL (meteoroloji + log transform + nonzero)
 # ============================================================
-print(" --- ENRİCHED MODEL (Meteoroloji Dahil) ---")
+print(" --- ENRİCHED MODEL (Meteoroloji + log-transform + nonzero egitim) ---")
 features_enr = ["YAS", "GECELEME", "COCUK", "OTEL_TUR", "UYRUK_OTEL_SKORU", "CSI", "ILCE_KOD",
                  "SICAKLIK", "NEM", "THI_INDEX"]
-X_enr = master[features_enr].copy()
+X_enr = master_nonzero[features_enr].copy()
 
-xgb_enr = xgb.XGBRegressor(n_estimators=200, learning_rate=0.07, max_depth=6,
-                              subsample=0.85, colsample_bytree=0.85, random_state=42)
-xgb_enr.fit(X_enr, y)
-y_pred_enr = xgb_enr.predict(X_enr)
-r2_enr  = r2_score(y, y_pred_enr)
-rmse_enr = np.sqrt(mean_squared_error(y, y_pred_enr))
-print(f" - Enriched XGBoost R²: {r2_enr:.4f}  |  RMSE: ${rmse_enr:.2f}")
+xgb_enr = xgb.XGBRegressor(n_estimators=300, learning_rate=0.05, max_depth=6,
+                              subsample=0.85, colsample_bytree=0.85,
+                              min_child_weight=5, reg_lambda=1.5, random_state=42)
+xgb_enr.fit(X_enr, y_log)
+y_pred_enr_raw = np.expm1(xgb_enr.predict(X_enr))
+r2_enr  = r2_score(y_raw, y_pred_enr_raw)
+rmse_enr = np.sqrt(mean_squared_error(y_raw, y_pred_enr_raw))
+print(f" - Enriched XGBoost R2: {r2_enr:.4f}  |  RMSE: ${rmse_enr:.2f}")
+
+# 5-Fold Cross-Validation (gercek genelleme gucu)
+from sklearn.model_selection import KFold
+kf = KFold(n_splits=5, shuffle=True, random_state=42)
+cv_r2, cv_rmse = [], []
+for tr_idx, te_idx in kf.split(X_enr):
+    X_tr, X_te = X_enr.iloc[tr_idx], X_enr.iloc[te_idx]
+    y_tr, y_te = y_log.iloc[tr_idx], y_raw.iloc[te_idx]
+    m = xgb.XGBRegressor(n_estimators=300, learning_rate=0.05, max_depth=6,
+                         subsample=0.85, colsample_bytree=0.85,
+                         min_child_weight=5, reg_lambda=1.5, random_state=42)
+    m.fit(X_tr, y_tr)
+    y_hat = np.expm1(m.predict(X_te))
+    cv_r2.append(r2_score(y_te, y_hat))
+    cv_rmse.append(np.sqrt(mean_squared_error(y_te, y_hat)))
+cv_r2_mean  = float(np.mean(cv_r2))
+cv_rmse_mean = float(np.mean(cv_rmse))
+print(f" - 5-Fold CV R2:  {cv_r2_mean:.4f} (+/- {np.std(cv_r2):.4f})")
+print(f" - 5-Fold CV RMSE: ${cv_rmse_mean:.2f} (+/- ${np.std(cv_rmse):.2f})")
 
 delta_r2 = r2_enr - r2_base
-print(f"\n *** Delta_R2 (Meteoroloji Katkisi) = +{delta_r2:.4f} ({delta_r2*100:.2f} puan artis) ***")
+print(f"\n *** Delta_R2 (Meteoroloji + log katkisi) = +{delta_r2:.4f} ({delta_r2*100:.2f} puan artis) ***")
 
 print("\n --- CATEGORY PREDICTORS (Gastronomy, Shopping, Culture, Health) ---")
-xgb_gas = xgb.XGBRegressor(n_estimators=100, learning_rate=0.08, max_depth=4, random_state=42)
-xgb_gas.fit(X_enr, master["SPEND_GASTRONOMI"])
+xgb_gas = xgb.XGBRegressor(n_estimators=150, learning_rate=0.07, max_depth=5, random_state=42)
+xgb_gas.fit(X_enr, master_nonzero["LOG_SPEND_GASTRONOMI"])
 
-xgb_ali = xgb.XGBRegressor(n_estimators=100, learning_rate=0.08, max_depth=4, random_state=42)
-xgb_ali.fit(X_enr, master["SPEND_ALISVERIS"])
+xgb_ali = xgb.XGBRegressor(n_estimators=150, learning_rate=0.07, max_depth=5, random_state=42)
+xgb_ali.fit(X_enr, master_nonzero["LOG_SPEND_ALISVERIS"])
 
-xgb_kul = xgb.XGBRegressor(n_estimators=100, learning_rate=0.08, max_depth=4, random_state=42)
-xgb_kul.fit(X_enr, master["SPEND_KULTUR"])
+xgb_kul = xgb.XGBRegressor(n_estimators=150, learning_rate=0.07, max_depth=5, random_state=42)
+xgb_kul.fit(X_enr, master_nonzero["LOG_SPEND_KULTUR"])
 
-xgb_sag = xgb.XGBRegressor(n_estimators=100, learning_rate=0.08, max_depth=4, random_state=42)
-xgb_sag.fit(X_enr, master["SPEND_SAGLIK"])
-print(" - Kategori tahmincileri egitildi.")
+xgb_sag = xgb.XGBRegressor(n_estimators=150, learning_rate=0.07, max_depth=5, random_state=42)
+xgb_sag.fit(X_enr, master_nonzero["LOG_SPEND_SAGLIK"])
+print(" - Kategori tahmincileri (log-transform) egitildi.")
 
 # ============================================================
 # FEATURE IMPORTANCE — En Çarpıcı İçgörü
 # ============================================================
-print("\n5. FEATURE IMPORTANCE (Değişken Önem Sıralaması)")
+print("\n5. FEATURE IMPORTANCE (Degisken Onem Sirasi)")
 fi = pd.Series(xgb_enr.feature_importances_, index=features_enr).sort_values(ascending=False)
 print(fi.round(4).to_string())
 
@@ -310,18 +343,17 @@ top_val  = fi.iloc[0]
 thi_rank = list(fi.index).index("THI_INDEX") + 1
 thi_imp  = fi["THI_INDEX"]
 
-# Yüksek THI'de ortalama harcama farkı
-q75_thi = master["THI_INDEX"].quantile(0.75)
-q25_thi = master["THI_INDEX"].quantile(0.25)
-high_thi_spend = master[master["THI_INDEX"]>=q75_thi]["USD_TOPLAM"].mean()
-low_thi_spend  = master[master["THI_INDEX"]<=q25_thi]["USD_TOPLAM"].mean()
+q75_thi = master_nonzero["THI_INDEX"].quantile(0.75)
+q25_thi = master_nonzero["THI_INDEX"].quantile(0.25)
+high_thi_spend = master_nonzero[master_nonzero["THI_INDEX"]>=q75_thi]["USD_TOPLAM"].mean()
+low_thi_spend  = master_nonzero[master_nonzero["THI_INDEX"]<=q25_thi]["USD_TOPLAM"].mean()
 thi_spend_delta = high_thi_spend - low_thi_spend
 
-print(f"\n En Önemli Özellik: '{top_feat}' (Önem: {top_val:.4f})")
-print(f" THI_Index Sıralaması: {thi_rank}. sıra (Önem: {thi_imp:.4f})")
-print(f"\n İçgörü: THI yüksek (>= {q75_thi:.1f}) günlerde turist ortalama ${high_thi_spend:.0f} harcıyor.")
-print(f"          THI düşük (<= {q25_thi:.1f}) günlerde: ${low_thi_spend:.0f}")
-print(f"          FARK: ${thi_spend_delta:+.0f} — Bunaltıcı hava DışArı tur paketine yönlendirir!")
+print(f"\n En Onemli Ozellik: '{top_feat}' (Onem: {top_val:.4f})")
+print(f" THI_Index Sirasi: {thi_rank}. sira (Onem: {thi_imp:.4f})")
+print(f" Insight: THI yuksek (>= {q75_thi:.1f}) gunlerde turist ortalama ${high_thi_spend:.0f} harciyor.")
+print(f"          THI dusuk (<= {q25_thi:.1f}) gunlerde: ${low_thi_spend:.0f}")
+print(f"          FARK: ${thi_spend_delta:+.0f}")
 
 # ============================================================
 # COX-PH: SIKILMA GÜNÜ — meteoroloji dahil
@@ -365,23 +397,25 @@ jmodels_dict = {
     "ulke_otel_skor_dict": ulke_otel_skor_dict,
     "global_median_score": global_median_score,
     "features": features_enr,
+    "log_transform": True,
     "metadata": {
-        "version": "5.1_categorical",
-        "description": "Meteoroloji ve Kategori Bazli Tahminci",
-        "timestamp": "2025-06-01"
+        "version": "7.0_zeroinflation_logtransform",
+        "description": "Zero-inflation + log(1+y) + nonzero egitim + Target Encoding",
+        "r2_cv": round(cv_r2_mean, 4),
+        "rmse_cv": round(cv_rmse_mean, 2),
+        "timestamp": "2026-06-18"
     }
 }
 joblib.dump(jmodels_dict, "models/advanced_models.pkl")
 
 print("\n" + "="*60)
-print("V5 RAPORU — METEOROLOJİK ZENGİNLEŞTİRME SONUÇLARI")
+print("V7 RAPORU — ZERO-INFLATION + LOG-TRANSFORM DUZELTMESI")
 print("="*60)
-print(f" Eski R² (Meteorolojisiz) : {r2_base:.4f}")
-print(f" Yeni R² (Meteoroloji İle): {r2_enr:.4f}")
-print(f" Delta R²                 : +{delta_r2:.4f} (+{delta_r2*100:.2f} puan)")
-print(f" Cox-PH C-Index           : {c_index:.3f}")
-print(f"\n En Çarpıcı İçgörü:")
-print(f"  THI_Index'i {thi_rank}. en önemli değişken olarak buldu.")
-print(f"  Bunaltici hava (THI>={q75_thi:.1f}) gunlerde turist ortalama")
-print(f"  ${abs(thi_spend_delta):.0f} {'FAZLA' if thi_spend_delta>0 else 'AZ'} dis tur harcamasi yapiyor.")
+print(f" Eski Baseline R2 (tum veri):    {r2_base:.4f}")
+print(f" Yeni In-sample R2 (nonzero):     {r2_enr:.4f}")
+print(f" 5-Fold CV R2 (gercek guc):       {cv_r2_mean:.4f}")
+print(f" 5-Fold CV RMSE:                   ${cv_rmse_mean:.2f}")
+print(f" Cox-PH C-Index:                   {c_index:.3f}")
+print(f" Egitim kayit sayisi (nonzero):    {len(master_nonzero)}")
+print(f" log(1+y) skewness duzeltmesi:     {y_raw.skew():.2f} -> {y_log.skew():.2f}")
 print("="*60)

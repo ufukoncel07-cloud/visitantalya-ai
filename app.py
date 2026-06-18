@@ -130,6 +130,7 @@ def predict():
         features = binaries["features"]
         ulke_otel_skor_dict = binaries.get("ulke_otel_skor_dict", {})
         global_median_score = binaries.get("global_median_score", 150.0)
+        log_transform = binaries.get("log_transform", False)
         ulke_mem_profiles = state.get("ulke_mem_profiles", {})
         ulke_priors = state.get("ulke_priors", {})
         ulke_decay_profiles = state.get("ulke_decay_profiles", {})
@@ -218,6 +219,8 @@ def predict():
             columns=features
         )
         usd_p = float(xgb_budget.predict(fv_df)[0])
+        if log_transform:
+            usd_p = float(np.expm1(usd_p))
         usd_p = max(50.0, min(usd_p, 10000.0))
 
         surv_df = pd.DataFrame(
@@ -247,12 +250,19 @@ def predict():
             columns=features
         )
         usd_p = float(xgb_budget.predict(fv_df)[0])
+        if log_transform:
+            usd_p = float(np.expm1(usd_p))
         usd_p = max(50.0, min(usd_p, 10000.0))
 
         usd_gas = float(xgb_gas.predict(fv_df)[0]) if xgb_gas else 0
         usd_ali = float(xgb_ali.predict(fv_df)[0]) if xgb_ali else 0
         usd_kul = float(xgb_kul.predict(fv_df)[0]) if xgb_kul else 0
         usd_sag = float(xgb_sag.predict(fv_df)[0]) if xgb_sag else 0
+        if log_transform:
+            usd_gas = float(np.expm1(usd_gas)) if xgb_gas else 0
+            usd_ali = float(np.expm1(usd_ali)) if xgb_ali else 0
+            usd_kul = float(np.expm1(usd_kul)) if xgb_kul else 0
+            usd_sag = float(np.expm1(usd_sag)) if xgb_sag else 0
 
         usd_gas = max(0, usd_gas); usd_ali = max(0, usd_ali)
         usd_kul = max(0, usd_kul); usd_sag = max(0, usd_sag)
