@@ -83,6 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // XAI Charts
     let decayChartInstance = null;
     let budgetChartInstance = null;
+    let harcamaPieChartInstance = null;
 
     function populateResult(data) {
         document.getElementById('res-tour').textContent = data.onerilecek_tur.replace('_', ' ');
@@ -95,10 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('res-csi').textContent = `${data.memnuniyet_csi} / 10`;
 
         if (data.harcama_profili) {
-            document.getElementById('res-gas').textContent = `$${data.harcama_profili.gastronomi_usd}`;
-            document.getElementById('res-ali').textContent = `$${data.harcama_profili.alisveris_usd}`;
-            document.getElementById('res-kul').textContent = `$${data.harcama_profili.kultur_usd}`;
-            document.getElementById('res-sag').textContent = `$${data.harcama_profili.saglik_usd}`;
+            renderHarcamaPieChart(data.harcama_profili);
         }
 
         // Render XAI Charts
@@ -180,6 +178,57 @@ document.addEventListener('DOMContentLoaded', () => {
                 scales: {
                     y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
                     x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    function renderHarcamaPieChart(harcama) {
+        const ctx = document.getElementById('harcamaPieChart').getContext('2d');
+        if(harcamaPieChartInstance) harcamaPieChartInstance.destroy();
+
+        const dataValues = [harcama.gastronomi_usd, harcama.alisveris_usd, harcama.kultur_usd, harcama.saglik_usd];
+        const total = dataValues.reduce((a, b) => a + b, 0);
+        
+        // If total is 0 to avoid division by zero
+        if(total === 0) return;
+
+        harcamaPieChartInstance = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: ['Gastronomi', 'Alışveriş', 'Kültür', 'Sağlık/Spa'],
+                datasets: [{
+                    data: dataValues,
+                    backgroundColor: [
+                        '#f59e0b', // amber
+                        '#3b82f6', // blue
+                        '#8b5cf6', // purple
+                        '#10b981'  // green
+                    ],
+                    borderColor: 'rgba(0,0,0,0.1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: '#cbd5e1',
+                            font: { size: 11 }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const value = context.raw;
+                                const percentage = Math.round((value / total) * 100);
+                                return ` ${context.label}: %${percentage}`;
+                            }
+                        }
+                    }
                 }
             }
         });

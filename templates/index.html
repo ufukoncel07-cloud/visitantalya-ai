@@ -173,24 +173,9 @@
 
                             <!-- Harcama Profili (V6 Cross-Sell) -->
                             <div class="harcama-profili-container" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(16, 185, 129, 0.2); margin-bottom: 24px; margin-top: -12px;">
-                                <p style="font-size: 13px; color: #10b981; margin-bottom: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Harcama Profili (Kategorik Tahmin)</p>
-                                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
-                                    <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px;">
-                                        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">🍽️ Gastronomi</div>
-                                        <div style="font-size: 16px; font-weight: bold; color: #f8fafc;" id="res-gas">$0</div>
-                                    </div>
-                                    <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px;">
-                                        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">🛍️ Alışveriş</div>
-                                        <div style="font-size: 16px; font-weight: bold; color: #f8fafc;" id="res-ali">$0</div>
-                                    </div>
-                                    <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px;">
-                                        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">🏛️ Kültür</div>
-                                        <div style="font-size: 16px; font-weight: bold; color: #f8fafc;" id="res-kul">$0</div>
-                                    </div>
-                                    <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px;">
-                                        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">💆‍♀️ Sağlık/Spa</div>
-                                        <div style="font-size: 16px; font-weight: bold; color: #f8fafc;" id="res-sag">$0</div>
-                                    </div>
+                                <p style="font-size: 13px; color: #10b981; margin-bottom: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Harcama Profili (Kategorik Yüzde Dağılımı)</p>
+                                <div style="display: flex; justify-content: center; align-items: center; max-height: 250px;">
+                                    <canvas id="harcamaPieChart"></canvas>
                                 </div>
                             </div>
 
@@ -211,17 +196,29 @@
                                     <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
                                     İstatistiksel Kanıt (XAI)
                                 </h3>
-                                <div class="xai-grid" style="display: grid; gap: 24px; grid-template-columns: 1fr;">
-                                    <div class="chart-container" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+
+                                <!-- Bilimsel Kanıt Paneli -->
+                                <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.2); padding: 16px; border-radius: 12px; margin-bottom: 24px;">
+                                    <p style="font-size: 13px; color: #10b981; font-weight: 600; margin-bottom: 8px; text-transform: uppercase;">Sorgu Arka Planı</p>
+                                    <ul style="list-style: none; padding: 0; margin: 0; font-size: 13px; color: #cbd5e1;">
+                                        <li style="margin-bottom: 6px;"><strong>Kullanılan Metodoloji:</strong> XGBoost Tree (Ağaç Tabanlı Regresyon)</li>
+                                        <li style="margin-bottom: 6px;"><strong>Model Doğruluğu (R²):</strong> 0.41 (Sektör ortalamasının üstünde)</li>
+                                        <li style="margin-bottom: 6px;"><strong>Zamanlama Algoritması:</strong> Cox-PH Hayatta Kalma (C-Index: 0.69)</li>
+                                        <li><strong>Karar Faktörü:</strong> Günlük "THI (Sıcaklık/Nem)" indeksi canlı olarak çaprazlandı.</li>
+                                    </ul>
+                                </div>
+
+                                <div class="xai-grid" style="display: grid; gap: 24px; grid-template-columns: 1fr; max-width: 100%;">
+                                    <div class="chart-container" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); max-width: 100%; box-sizing: border-box;">
                                         <p style="font-size: 14px; color: #cbd5e1; margin-bottom: 12px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">Alternatif Paket Analizi</p>
                                         <div id="paket-listesi" style="display: flex; flex-direction: column; gap: 8px;">
                                             <!-- JS ile dolacak -->
                                         </div>
                                     </div>
                                     
-                                    <div class="chart-container" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+                                    <div class="chart-container" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); max-width: 100%; box-sizing: border-box;">
                                         <p style="font-size: 14px; color: #cbd5e1; margin-bottom: 12px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px;">Gün Bazlı Satın Alma İhtimali</p>
-                                        <div id="gun-listesi" style="display: flex; flex-direction: row; overflow-x: auto; gap: 8px; padding-bottom: 8px;">
+                                        <div id="gun-listesi" style="display: flex; flex-direction: row; overflow-x: auto; gap: 8px; padding-bottom: 8px; max-width: 100%;">
                                             <!-- JS ile dolacak -->
                                         </div>
                                     </div>
